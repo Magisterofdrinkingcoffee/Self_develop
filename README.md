@@ -23,9 +23,9 @@ Everything is editable on the site, including the minimums and their targets (Se
 
 The site works right away, but at this point data is saved only in the browser you use.
 
-### 3. Connect storage (so data syncs between phone and laptop)
-1. In your Vercel project → **Storage** tab → add **Upstash for Redis** from the Marketplace (free plan is plenty) and connect it to this project.
-2. This adds the `KV_REST_API_URL` and `KV_REST_API_TOKEN` environment variables automatically. (`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` also work.)
+### 3. Connect Supabase (data sync + book storage)
+1. Create a Supabase project and run `supabase/schema.sql` in its SQL Editor (creates the `life_data` table and a private `books` bucket).
+2. Supabase → Project Settings → Integrations → **Vercel** → connect the project to this Vercel project. This adds `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` automatically.
 
 ### 4. Add a password (strongly recommended — this is your personal data)
 1. Vercel project → **Settings → Environment Variables** → add `APP_PASSWORD` with a password of your choice.
@@ -43,12 +43,12 @@ npm run dev
 Open http://localhost:3000. Without the env variables, data is kept in the browser.
 
 ## How things fit together
-- **Today** – minimums with +/− counters, to-dos (unfinished ones from earlier days carry over), daily summary, today's timetable, upcoming deadlines, current book. Use the date arrows to fill in past days.
+- **Today** – weekly minimums (log each day, it adds up to the week target) with +/− counters, to-dos (unfinished ones from earlier days carry over), daily summary, today's timetable, upcoming deadlines, current book. Use the date arrows to fill in past days.
 - **Planner** – week view: minimums grid, weekly summary, all daily summaries of the week, and the weekly timetable editor.
-- **Reading** – each book has "where I stopped", notes with page numbers, and a summary. Updating the page automatically adds the pages read to your Book minimum for today (change or turn off in Settings).
+- **Reading** – upload a PDF and read it on the site; it remembers your page. Each book has "where I stopped", notes with page numbers, and a summary. Updating the page automatically adds the pages read to your Book minimum for today (change or turn off in Settings).
 - **Studies** – subjects with notes, deadlines with countdowns.
 - **Projects** – status + the next concrete step for each.
 - **Sport / Food / Finance** – quick logging with weekly/monthly totals.
 - **Settings** – edit minimums (name, target, unit, order), calorie target, workout goal, currency, expense categories, backup/restore.
 
-Data is stored as one JSON document (`life-tracker:data`) in Redis. Download a backup from Settings now and then.
+Data is stored as one JSON document in the Supabase table `life_data`; book PDFs are in the private `books` storage bucket. Download a backup from Settings now and then.
