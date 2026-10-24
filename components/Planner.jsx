@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card, Del, Empty, Header, NoteArea } from "./ui";
-import { DAYS, addDays, dateKey, fmtDate, uid, weekStart } from "@/lib/data";
+import { DAYS, addDays, dateKey, fmtDate, uid, weekStart, weekTotal } from "@/lib/data";
 
 export default function Planner({ data, update }) {
   const [week, setWeek] = useState(weekStart());
@@ -14,7 +14,7 @@ export default function Planner({ data, update }) {
   const todosDone = todosIn.filter((t) => t.done).length;
   const workouts = data.workouts.filter((w) => days.includes(w.date)).length;
   const spent = data.money.filter((m) => days.includes(m.date) && m.type === "expense").reduce((s, m) => s + Number(m.amount || 0), 0);
-  const fullDays = days.filter((d) => data.minimums.length && data.minimums.every((m) => (data.minLog[d]?.[m.id] || 0) >= Number(m.target))).length;
+  const minsMet = data.minimums.filter((m) => weekTotal(data, week, m.id) >= Number(m.target)).length;
 
   return (
     <>
@@ -31,7 +31,7 @@ export default function Planner({ data, update }) {
       />
 
       <div className="stats">
-        <div className="stat"><span className="muted small">Days all minimums met</span><strong>{fullDays} / 7</strong></div>
+        <div className="stat"><span className="muted small">Minimums met</span><strong>{minsMet} / {data.minimums.length}</strong></div>
         <div className="stat"><span className="muted small">Tasks done</span><strong>{todosDone} / {todosIn.length}</strong></div>
         <div className="stat"><span className="muted small">Workouts</span><strong>{workouts} / {data.settings.workoutsPerWeek}</strong></div>
         <div className="stat"><span className="muted small">Spent this week</span><strong>{data.settings.currency} {spent.toFixed(2)}</strong></div>
@@ -44,19 +44,24 @@ export default function Planner({ data, update }) {
               <tr>
                 <th></th>
                 {days.map((d, i) => <th key={d} className={d === today ? "today" : ""}>{DAYS[i]}<br /><span className="muted small">{fmtDate(d, { day: "numeric" })}</span></th>)}
+                <th>Week</th>
               </tr>
             </thead>
             <tbody>
-              {data.minimums.map((m) => (
-                <tr key={m.id}>
-                  <td className="rowlabel">{m.name}</td>
-                  {days.map((d) => {
-                    const v = data.minLog[d]?.[m.id] || 0;
-                    const ok = v >= Number(m.target);
-                    return <td key={d} className={ok ? "cell ok" : v > 0 ? "cell part" : "cell"} title={`${v} / ${m.target}`}>{ok ? "✓" : v > 0 ? v : ""}</td>;
-                  })}
-                </tr>
-              ))}
+              {data.minimums.map((m) => {
+                const total = weekTotal(data, week, m.id);
+                const ok = total >= Number(m.target);
+                return (
+                  <tr key={m.id}>
+                    <td className="rowlabel">{m.name}</td>
+                    {days.map((d) => {
+                      const v = data.minLog[d]?.[m.id] || 0;
+                      return <td key={d} className={v > 0 ? "cell part" : "cell"}>{v > 0 ? v : ""}</td>;
+                    })}
+                    <td className={`cell total ${ok ? "ok" : ""}`}>{total}/{m.target}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

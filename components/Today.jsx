@@ -2,42 +2,47 @@
 
 import { useState } from "react";
 import { Bar, Card, Del, Empty, Header, NoteArea } from "./ui";
-import { addDays, dateKey, fmtDate, minimumsDone, money, parseKey, streak, uid } from "@/lib/data";
+import { addDays, dateKey, fmtDate, minimumsDone, money, parseKey, streak, uid, weekStart, weekTotal } from "@/lib/data";
 
 export function Minimums({ data, update, day }) {
   const log = data.minLog[day] || {};
+  const ws = weekStart(day);
   const set = (id, val) =>
     update((d) => {
       d.minLog[day] = { ...(d.minLog[day] || {}), [id]: Math.max(0, Number(val) || 0) };
     });
-  const done = data.minimums.filter((m) => (log[m.id] || 0) >= Number(m.target)).length;
+  const done = data.minimums.filter((m) => weekTotal(data, ws, m.id) >= Number(m.target)).length;
+  const daysLeft = 7 - Math.round((parseKey(day) - parseKey(ws)) / 864e5); // incl. this day
 
   return (
-    <Card title="Minimums" right={<span className="pill">{done}/{data.minimums.length} done</span>}>
-      {data.minimums.length === 0 && <Empty>Add your daily minimums in Settings.</Empty>}
+    <Card title="Weekly minimums" right={<span className="pill">{done}/{data.minimums.length} done this week</span>}>
+      {data.minimums.length === 0 && <Empty>Add your weekly minimums in Settings.</Empty>}
       <div className="mins">
         {data.minimums.map((m) => {
           const v = log[m.id] || 0;
-          const ok = v >= Number(m.target);
+          const total = weekTotal(data, ws, m.id);
+          const target = Number(m.target);
+          const ok = total >= target;
+          const perDay = ok ? 0 : Math.ceil((target - (total - v)) / daysLeft);
           return (
             <div key={m.id} className={`min ${ok ? "ok" : ""}`}>
               <div className="minrow">
-                <button className="check" onClick={() => set(m.id, ok ? 0 : m.target)} aria-label={`Mark ${m.name} done`}>
-                  {ok ? "✓" : ""}
-                </button>
+                <span className="check static" aria-label={ok ? "Week done" : "In progress"}>{ok ? "✓" : ""}</span>
                 <div className="minname">
                   <strong>{m.name}</strong>
                   <span className="muted small">
-                    {v} / {m.target} {m.unit}
+                    {total} / {target} {m.unit} this week
+                    {!ok && perDay > 0 && <> · ~{perDay}/day to finish</>}
                   </span>
                 </div>
+                <span className="muted small">today</span>
                 <div className="stepper">
                   <button onClick={() => set(m.id, v - 1)} aria-label="Minus one">−</button>
                   <input type="number" inputMode="numeric" value={v || ""} placeholder="0" onChange={(e) => set(m.id, e.target.value)} />
                   <button onClick={() => set(m.id, v + 1)} aria-label="Plus one">+</button>
                 </div>
               </div>
-              <Bar value={v} max={Number(m.target)} />
+              <Bar value={total} max={target} />
             </div>
           );
         })}
@@ -122,10 +127,10 @@ export default function Today({ data, update, go }) {
       />
 
       <div className="stats">
-        <div className="stat"><span className="muted small">Minimums streak</span><strong>{s} {s === 1 ? "day" : "days"}</strong></div>
+        <div className="stat"><span className="muted small">Minimums streak</span><strong>{s} {s === 1 ? "week" : "weeks"}</strong></div>
         <div className="stat"><span className="muted small">Calories</span><strong>{kcal} / {data.settings.calorieTarget}</strong></div>
         <div className="stat"><span className="muted small">Spent</span><strong>{money(spent, cur)}</strong></div>
-        <div className="stat"><span className="muted small">All minimums</span><strong>{minimumsDone(data, day) ? "Done ✓" : "In progress"}</strong></div>
+        <div className="stat"><span className="muted small">This week's minimums</span><strong>{minimumsDone(data, weekStart(day)) ? "Done ✓" : "In progress"}</strong></div>
       </div>
 
       <div className="grid2">

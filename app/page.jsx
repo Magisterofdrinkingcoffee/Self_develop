@@ -144,7 +144,7 @@ export default function App() {
       <main className="main">
         {!storage && (
           <div className="banner">
-            Storage isn't connected yet, so data is only kept in this browser. Connect Upstash Redis in Vercel to sync across devices (see README).
+            Storage isn't connected yet, so data is only kept in this browser. Connect Supabase to sync across devices (see README).
           </div>
         )}
         <Current data={data} update={update} go={go} storage={storage} />

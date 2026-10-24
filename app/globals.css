@@ -280,3 +280,21 @@ input[type="checkbox"] { width: auto; }
 /* Fixes */
 .pagehead select { width: auto; }
 .weekgrid .rowlabel { width: 1%; }
+.check.static { display: inline-flex; align-items: center; justify-content: center; cursor: default; }
+.min.ok .check.static { background: var(--done); border-color: var(--done); }
+.weekgrid .cell.total { background: transparent; border: 1px solid var(--line); color: var(--text); white-space: nowrap; padding: 0 6px; }
+.weekgrid .cell.total.ok { background: var(--done); border-color: var(--done); color: var(--accent-text); }
+
+/* Reader */
+.reader { display: flex; flex-direction: column; gap: 12px; }
+.readerbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 10px 0; background: var(--bg); }
+.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.readerpage { display: flex; justify-content: center; overflow-x: auto; min-height: 60vh; }
+.readerpage canvas { background: #fff; border-radius: 6px; box-shadow: 0 2px 16px rgba(0,0,0,.18); cursor: pointer; max-width: none; }
+.readerpage canvas.hidden { display: none; }
+.center-text { text-align: center; padding: 40px 0; }
+.readernav { position: sticky; bottom: 0; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 10px 0; background: var(--bg); }
+@media (max-width: 820px) { .readernav { bottom: 64px; } }
+.btn.disabled, .btn:disabled { opacity: .5; cursor: not-allowed; }
+label.btn { display: inline-flex; align-items: center; }
+.wrapgap { flex-wrap: wrap; gap: 12px; }

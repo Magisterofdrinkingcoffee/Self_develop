@@ -53,8 +53,8 @@ export default function Settings({ data, update, storage }) {
     <>
       <Header title="Settings" sub="Minimums, targets and backups" />
 
-      <Card title="Daily minimums">
-        <p className="muted small">These show on Today every day. Change targets any time; past days keep what you logged.</p>
+      <Card title="Weekly minimums">
+        <p className="muted small">Targets are per week (Monday–Sunday). Log what you do each day on Today and it adds up toward the week.</p>
         <div className="minedit">
           {data.minimums.map((x, i) => (
             <div key={x.id} className="minedit-row">
@@ -77,7 +77,7 @@ export default function Settings({ data, update, storage }) {
           <button className="btn primary">Add</button>
         </form>
         <label className="field">
-          <span className="muted small">When you update the page you stopped at in a book, add the pages read to:</span>
+          <span className="muted small">Pages you read in a book (in the reader or by updating "where I stopped") count toward:</span>
           <select value={s.readingMinimumId || ""} onChange={(e) => setS({ readingMinimumId: e.target.value })}>
             <option value="">Don't count automatically</option>
             {data.minimums.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
