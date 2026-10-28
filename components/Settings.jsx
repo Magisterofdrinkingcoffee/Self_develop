@@ -119,7 +119,7 @@ export default function Settings({ data, update, storage }) {
           <button className="btn" onClick={exportData}>Download backup</button>
           <button className="btn" onClick={() => fileRef.current?.click()}>Restore from backup</button>
           <input ref={fileRef} type="file" accept="application/json" hidden onChange={importData} />
-          <button className="btn" onClick={logout}>Lock</button>
+          <button className="btn" onClick={logout}>Log out</button>
         </div>
       </Card>
     </>

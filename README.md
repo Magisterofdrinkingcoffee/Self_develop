@@ -27,13 +27,11 @@ The site works right away, but at this point data is saved only in the browser y
 1. Create a Supabase project and run `supabase/schema.sql` in its SQL Editor (creates the `life_data` table and a private `books` bucket).
 2. Supabase → Project Settings → Integrations → **Vercel** → connect the project to this Vercel project. This adds `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` automatically.
 
-### 4. Add a password (strongly recommended — this is your personal data)
-1. Vercel project → **Settings → Environment Variables** → add `APP_PASSWORD` with a password of your choice.
-2. **Redeploy** (Deployments → ⋯ → Redeploy) so the new variables take effect.
-
-You'll be asked for the password once per device; it's remembered for a year. "Lock" in Settings logs out.
-
-> If you used the site before connecting storage, go to Settings → **Download backup** first, then after connecting storage use **Restore from backup** to move that data into the database.
+### 4. Login (only you)
+The whole site is private. You sign in with your email and get a one-click login link from Supabase; the session lasts 90 days.
+- Only the owner's email (stored as a hash in `lib/server.js`) and any emails in the optional `ALLOWED_EMAIL` env var can log in. Anyone else never even gets an email.
+- In Supabase → Authentication → URL Configuration, set **Site URL** to your site (e.g. `https://self-develop-murex.vercel.app`) and add `https://self-develop-murex.vercel.app/**` to **Redirect URLs**, so the login link comes back to the site.
+- "Log out" is in Settings.
 
 ## Run locally
 ```bash

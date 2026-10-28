@@ -116,7 +116,7 @@ export default function App() {
   };
 
   if (status === "loading") return <div className="center muted">Loading…</div>;
-  if (status === "locked") return <Login onDone={load} />;
+  if (status === "locked") return <Login />;
   if (status === "error")
     return (
       <div className="center">
@@ -153,25 +153,39 @@ export default function App() {
   );
 }
 
-function Login({ onDone }) {
-  const [pw, setPw] = useState("");
+function Login() {
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState("idle"); // idle | sending | sent
   const [err, setErr] = useState("");
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
+    setState("sending");
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw }),
-    });
-    if (res.ok) onDone();
-    else setErr("Wrong password");
+      body: JSON.stringify({ email }),
+    }).catch(() => null);
+    if (res?.ok) setState("sent");
+    else {
+      setErr((await res?.json().catch(() => ({})))?.error || "Something went wrong");
+      setState("idle");
+    }
   };
+  if (state === "sent")
+    return (
+      <div className="center login">
+        <div className="brand big">Life<span>.</span></div>
+        <p className="center-msg">If <strong>{email}</strong> has access, a login link is on its way.<br />Open it on this device.</p>
+        <button className="link" onClick={() => setState("idle")}>Use a different email</button>
+      </div>
+    );
   return (
     <form className="center login" onSubmit={submit}>
       <div className="brand big">Life<span>.</span></div>
-      <input type="password" placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus />
-      <button className="btn primary" type="submit">Unlock</button>
+      <p className="muted">Private. Sign in to continue.</p>
+      <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus required autoComplete="email" />
+      <button className="btn primary" type="submit" disabled={state === "sending"}>{state === "sending" ? "Sending…" : "Email me a login link"}</button>
       {err && <p className="err">{err}</p>}
     </form>
   );
