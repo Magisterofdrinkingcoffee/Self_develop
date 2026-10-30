@@ -4,8 +4,9 @@ import { Card, Empty } from "./ui";
 import Icon from "./Icon";
 import { addDays, fmtDate, parseKey } from "@/lib/data";
 import { localDay, localTime, useRemote } from "@/lib/useRemote";
+import { prayerEvents } from "@/lib/prayer";
 
-const SRC = { google: "Google", outlook: "Outlook", moodle: "Moodle", feed: "Calendar", class: "Timetable" };
+const SRC = { google: "Google", outlook: "Outlook", moodle: "Moodle", feed: "Calendar", class: "Timetable", prayer: "" };
 
 // Calendar events (Google, Outlook, iCal feeds) merged with the weekly timetable
 export function Agenda({ data, day, days = 3, go }) {
@@ -19,12 +20,14 @@ export function Agenda({ data, day, days = 3, go }) {
     const classes = data.schedule
       .filter((s) => Number(s.day) === dow)
       .map((s) => ({ id: `c:${s.id}:${k}`, title: s.title, location: s.place, time: s.start, end: s.end, source: "class" }));
-    const events = (res?.events || [])
+    // Prayers: only today's that are still ahead, so the agenda stays readable
+    const prayers = k === new Date().toLocaleDateString("en-CA") ? prayerEvents(data.settings, k).filter((p) => new Date(p.start) > new Date()) : [];
+    const events = [...(res?.events || []), ...prayers]
       .filter((e) => localDay(e.start) === k)
       .map((e) => ({ ...e, time: e.allDay ? "" : localTime(e.start), end: e.allDay ? "" : localTime(e.end) }));
     return { k, items: [...classes, ...events].sort((a, b) => (a.time || "").localeCompare(b.time || "")) };
   });
-  const total = byDay.reduce((s, d) => s + d.items.length, 0);
+  const total = byDay.reduce((s, d) => s + d.items.filter((e) => e.source !== "prayer").length, 0);
 
   return (
     <Card
@@ -33,7 +36,7 @@ export function Agenda({ data, day, days = 3, go }) {
     >
       {total === 0 && !loading && (
         <Empty>
-          Nothing on the next {days} days.{" "}
+          No classes or events in the next {days} days.{" "}
           <button className="link" onClick={() => go("settings")}>Connect calendars</button>
         </Empty>
       )}
@@ -52,6 +55,14 @@ export function Agenda({ data, day, days = 3, go }) {
                   </span>
                 </>
               );
+              if (e.source === "prayer")
+                return (
+                  <div key={e.id} className="ev src-prayer">
+                    <span className="t">{e.time}</span>
+                    <span className="sw" />
+                    <span className="what">{e.title}</span>
+                  </div>
+                );
               return e.link ? (
                 <a key={e.id} className={`ev src-${e.source}`} href={e.link} target="_blank" rel="noreferrer">{body}</a>
               ) : (

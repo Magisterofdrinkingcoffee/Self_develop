@@ -1,8 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import { Bar, Card, Del, Empty, Header } from "./ui";
+import { Bar, Card, Del, Empty, Header, Seg } from "./ui";
 import { addDays, dateKey, fmtDate, uid, weekStart } from "@/lib/data";
+
+// Daily weight jumps around with water and food; the 7-day average is the number that shows real progress.
+function avgAt(weights, k) {
+  const from = addDays(k, -6);
+  const w = weights.filter((x) => x.date >= from && x.date <= k);
+  return w.length ? w.reduce((s, x) => s + Number(x.kg), 0) / w.length : null;
+}
+
+function WeightChart({ weights }) {
+  const [range, setRange] = useState(60);
+  const today = dateKey();
+  const from = addDays(today, -range + 1);
+  const pts = weights.filter((w) => w.date >= from);
+  if (pts.length < 2) return <Empty>Log your weight a few times (mornings work best) to see the trend.</Empty>;
+  const days = Array.from({ length: range }, (_, i) => addDays(from, i));
+  const avg = days.map((d) => ({ d, v: d < pts[0].date ? null : avgAt(weights, d) }));
+  const vals = [...pts.map((p) => Number(p.kg)), ...avg.filter((a) => a.v != null).map((a) => a.v)];
+  const lo = Math.floor(Math.min(...vals) - 0.5), hi = Math.ceil(Math.max(...vals) + 0.5);
+  const W = 640, H = 200, L = 34, R = 8, T = 10, B = 22;
+  const x = (d) => L + (days.indexOf(d) / (range - 1)) * (W - L - R);
+  const y = (v) => T + (1 - (v - lo) / (hi - lo || 1)) * (H - T - B);
+  const line = avg.filter((a) => a.v != null).map((a, i) => `${i ? "L" : "M"}${x(a.d).toFixed(1)},${y(a.v).toFixed(1)}`).join(" ");
+  const ticks = Array.from({ length: 4 }, (_, i) => lo + ((hi - lo) * i) / 3);
+  const months = days.filter((d) => d.endsWith("-01") || d === days[0]);
+  return (
+    <>
+      <div className="row-between" style={{ marginBottom: 6 }}>
+        <span className="muted small"><span className="legend-dot" /> daily weigh-in <span className="legend-line" /> 7-day average</span>
+        <Seg value={range} onChange={setRange} options={[{ value: 30, label: "30d" }, { value: 60, label: "60d" }, { value: 180, label: "6m" }]} />
+      </div>
+      <svg className="wchart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Weight trend">
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} className="grid" />
+            <text x={L - 6} y={y(t)} className="tick" textAnchor="end" dominantBaseline="middle">{t.toFixed(0)}</text>
+          </g>
+        ))}
+        {months.map((d) => <text key={d} x={x(d)} y={H - 6} className="tick">{fmtDate(d, { month: "short", day: d === days[0] ? "numeric" : undefined })}</text>)}
+        {pts.map((p) => <circle key={p.id} cx={x(p.date)} cy={y(Number(p.kg))} r="3" className="dot"><title>{`${fmtDate(p.date)}: ${p.kg} kg`}</title></circle>)}
+        <path d={line} className="avg" />
+      </svg>
+    </>
+  );
+}
 
 const TYPES = ["Gym – upper body", "Gym – lower body", "Gym – full body", "Basketball", "Swimming", "Running", "Cycling", "Other"];
 
@@ -35,6 +79,9 @@ export default function Sport({ data, update }) {
   const weights = [...data.weights].sort((a, b) => a.date.localeCompare(b.date));
   const first = weights[0], last = weights[weights.length - 1];
   const change = first && last && first !== last ? (last.kg - first.kg).toFixed(1) : null;
+  const avgNow = last ? avgAt(weights, today) : null;
+  const avgWeekAgo = last ? avgAt(weights, addDays(today, -7)) : null;
+  const weekly = avgNow != null && avgWeekAgo != null ? (avgNow - avgWeekAgo).toFixed(1) : null;
 
   return (
     <>
@@ -42,9 +89,14 @@ export default function Sport({ data, update }) {
       <div className="stats">
         <div className="stat"><span className="muted small">This week</span><strong>{thisWeek.length} / {goal} workouts</strong><Bar value={thisWeek.length} max={goal} /></div>
         <div className="stat"><span className="muted small">Minutes this week</span><strong>{thisWeek.reduce((s, x) => s + Number(x.duration || 0), 0)}</strong></div>
-        <div className="stat"><span className="muted small">Current weight</span><strong>{last ? `${last.kg} kg` : "—"}</strong></div>
-        <div className="stat"><span className="muted small">Change since first log</span><strong>{change ? `${change > 0 ? "+" : ""}${change} kg` : "—"}</strong></div>
+        <div className="stat"><span className="muted small">7-day average</span><strong>{avgNow != null ? `${avgNow.toFixed(1)} kg` : "—"}</strong></div>
+        <div className="stat"><span className="muted small">Average vs last week</span><strong className={weekly < 0 ? "pos" : weekly > 0 ? "neg" : ""}>{weekly != null ? `${weekly > 0 ? "+" : ""}${weekly} kg` : "—"}</strong></div>
+        <div className="stat"><span className="muted small">Since first log</span><strong>{change ? `${change > 0 ? "+" : ""}${change} kg` : "—"}</strong></div>
       </div>
+
+      <Card title="Weight trend">
+        <WeightChart weights={weights} />
+      </Card>
 
       <div className="grid2">
         <Card title="Log a workout">

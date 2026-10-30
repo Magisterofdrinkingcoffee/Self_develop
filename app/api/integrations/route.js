@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthed, setSecret, storageEnabled } from "@/lib/server";
-import { getFeeds, parseIcs, status } from "@/lib/integrations";
+import { getFeeds, parseIcs, saveAppCreds, status } from "@/lib/integrations";
 import { uid } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +43,14 @@ export async function POST(req) {
       const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", { headers: { "x-goog-api-key": key }, cache: "no-store" });
       if (!res.ok) throw new Error("Google rejected that key. Copy it again from AI Studio.");
       await setSecret("gemini", { key });
+      return NextResponse.json({ ok: true });
+    }
+    if (b.action === "setAppCreds") {
+      await saveAppCreds(b.provider, b.id, b.secret);
+      return NextResponse.json({ ok: true });
+    }
+    if (b.action === "removeAppCreds") {
+      await setSecret(`${b.provider === "microsoft" ? "microsoft" : "google"}-app`, null);
       return NextResponse.json({ ok: true });
     }
     if (b.action === "removeGeminiKey") {

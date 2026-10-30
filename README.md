@@ -56,13 +56,13 @@ Moodle → Calendar → **Import or export calendars** → **Export calendar** �
 2. **APIs & Services → Library** → enable **Google Calendar API** and **Gmail API**.
 3. **OAuth consent screen** → External → add your Gmail as a test user. Then set **Publishing status → In production** (otherwise Google expires the connection every 7 days). You'll see an "unverified app" warning when connecting — that's expected for a personal app; click Advanced → continue.
 4. **Credentials → Create credentials → OAuth client ID** → Web application. Authorized redirect URI: `https://<your-site>/api/connect/google/callback`
-5. In Vercel → Settings → Environment Variables add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, redeploy, then press **Connect** in Settings.
+5. Paste the Client ID and Client secret in the app: **Settings → Connections → Google → Set up**, then press **Connect**. (Alternatively set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in Vercel.)
 
 ### Outlook (mail + calendar)
 1. [entra.microsoft.com](https://entra.microsoft.com) → **App registrations → New registration**. Supported accounts: *Any organizational directory and personal Microsoft accounts*. Redirect URI (Web): `https://<your-site>/api/connect/microsoft/callback`
 2. **Certificates & secrets → New client secret** (copy the *Value*).
 3. **API permissions** → Microsoft Graph → Delegated: `Calendars.Read`, `Mail.Read`, `User.Read`, `offline_access`.
-4. Vercel env vars: `MS_CLIENT_ID` (Application ID), `MS_CLIENT_SECRET`. Redeploy and press **Connect**.
+4. Paste the Application ID and secret value in **Settings → Connections → Outlook → Set up**, then press **Connect**. (Or set `MS_CLIENT_ID` / `MS_CLIENT_SECRET` in Vercel.)
 
 University accounts sometimes require admin approval for third-party apps. If Microsoft says "Need admin approval", use Outlook on the web → Settings → Calendar → **Shared calendars → Publish a calendar** → copy the ICS link and add it as a calendar link instead (calendar only, no mail).
 
@@ -72,14 +72,28 @@ Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). E
 - **Coach**: asks Gemini about your own numbers (minimums, meals, workouts, spending, deadlines, calendar).
 The app picks the newest Flash model automatically; set `GEMINI_MODEL` to force one. On the free tier Google may use prompts to improve its products, so don't log anything you wouldn't want seen.
 
+## Notifications
+Settings → Notifications → **Turn on for this device** (on iPhone: open the app from the Home Screen first; needs iOS 16.4+). Vercel Cron (`vercel.json`) sends a morning plan around 07:30 and an evening check-in around 21:30 Malaysia time (Vercel's free plan may run a cron any time within that hour). Each is sent at most once a day. Optional: set `CRON_SECRET` in Vercel to lock the cron URL.
+
+## Siri quick add
+Settings → Siri and quick add → **Show setup** gives the URL, a private token and the 4-step iOS Shortcut. Phrases: `Quran 10`, `book 20`, `spent 12.50 food lunch`, `ate nasi lemak` (Gemini estimates calories), `todo call landlord`, `weight 82.5`. Changes made while the app is open elsewhere are picked up within a minute; a device that tries to save over newer data gets the newer data instead.
+
+## More
+- **Prayer times** (Settings): calculated on the device, JAKIM-style by default for Kota Warisan; shown in today's agenda and the evening check-in. Expect ±2 minutes vs the official JAKIM table.
+- **Focus timer** (Studies): 25/50/90-minute sessions logged per subject; hours per subject this week; study time on Planner.
+- **Weight trend** (Sport): daily weigh-ins plus the 7-day average, and the change in that average week to week.
+- **Weekly review draft** (Planner → Draft with AI).
+- **House** (Finance → Дом Б): monthly contributions, shared-fund spending, expenses one person paid, who owes whom, and a copyable monthly report.
+
 ## Environment variables
 | Name | Needed for |
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Data sync, login (added by the Supabase integration) |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Calendar + Gmail |
-| `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, optional `MS_TENANT` | Outlook |
-| `GEMINI_API_KEY`, optional `GEMINI_MODEL` | Calorie estimates and Coach |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (or paste in Settings) | Google Calendar + Gmail |
+| `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, optional `MS_TENANT` (or paste in Settings) | Outlook |
+| `GEMINI_API_KEY` (or paste in Settings), optional `GEMINI_MODEL` | Calorie estimates, Coach, weekly review, Siri meal estimates |
 | `SESSION_SECRET` (optional) | Signs login cookies (defaults to the Supabase key) |
+| `CRON_SECRET` (optional) | Locks the daily notification cron URL |
 
 ## Run locally
 ```bash

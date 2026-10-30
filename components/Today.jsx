@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Bar, Card, Del, Empty, NoteArea } from "./ui";
 import Icon from "./Icon";
 import { Agenda, Inbox } from "./Connected";
+import { nextPrayer } from "@/lib/prayer";
 import { DAYS, addDays, dateKey, fmtDate, money, parseKey, streak, uid, weekDays, weekStart, weekTotal } from "@/lib/data";
 
 export function Minimums({ data, update, day }) {
@@ -146,6 +147,7 @@ export default function Today({ data, update, go }) {
   const minsMet = data.minimums.filter((m) => weekTotal(data, ws, m.id) >= Number(m.target)).length;
   const s = streak(data);
   const hour = new Date().getHours();
+  const np = isToday ? nextPrayer(data.settings) : null;
   const hello = hour < 5 ? "Still up" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
@@ -154,7 +156,10 @@ export default function Today({ data, update, go }) {
         <div className="hero-top">
           <div>
             <h1>{isToday ? `${hello}, ${data.settings.name || "there"}` : fmtDate(day, { weekday: "long", day: "numeric", month: "long" })}</h1>
-            <p className="sub">{isToday ? fmtDate(day, { weekday: "long", day: "numeric", month: "long" }) : "Editing a past day"}</p>
+            <p className="sub">
+              {isToday ? fmtDate(day, { weekday: "long", day: "numeric", month: "long" }) : "Editing a past day"}
+              {np && `, ${np.name} at ${np.time.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`}
+            </p>
           </div>
           <div className="daynav">
             <button className="btn" onClick={() => setDay(addDays(day, -1))} aria-label="Previous day"><Icon name="left" size={17} /></button>

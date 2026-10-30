@@ -10,9 +10,9 @@ export async function GET(req, { params }) {
   const origin = new URL(req.url).origin;
   if (!PROVIDERS[provider]) return NextResponse.json({ error: "Unknown provider" }, { status: 404 });
   if (!(await isAuthed())) return NextResponse.redirect(`${origin}/?connect_error=${encodeURIComponent("Sign in to the tracker first.")}`);
-  if (!configured(provider))
-    return NextResponse.redirect(`${origin}/?tab=settings&connect_error=${encodeURIComponent(`${PROVIDERS[provider].name} isn't set up yet. Add its client ID and secret in Vercel (see README).`)}`);
-  return NextResponse.redirect(authorizeUrl(provider, origin, await signState(provider)));
+  if (!(await configured(provider)))
+    return NextResponse.redirect(`${origin}/?tab=settings&connect_error=${encodeURIComponent(`${PROVIDERS[provider].name} isn't set up yet. Add its client ID and secret under Settings → Connections.`)}`);
+  return NextResponse.redirect(await authorizeUrl(provider, origin, await signState(provider)));
 }
 
 // DELETE /api/connect/google|microsoft -> forget the stored tokens

@@ -458,3 +458,28 @@ details.help summary { cursor: pointer; color: var(--accent); font-weight: 600; 
 a.btn { text-decoration: none; }
 .cardhead + .conn { border-top: 0; padding-top: 2px; }
 @media (max-width: 520px) { .hero .daynav { flex-wrap: nowrap; } }
+
+.ev.src-prayer { padding: 2px 0; }
+.ev.src-prayer .sw { background: var(--line); width: 4px; }
+.ev.src-prayer .what { color: var(--muted); font-size: 13px; }
+
+/* Weight chart */
+.wchart { width: 100%; height: auto; display: block; }
+.wchart .grid { stroke: var(--line); stroke-width: 1; }
+.wchart .tick { fill: var(--muted); font-size: 11px; font-family: var(--font); }
+.wchart .dot { fill: var(--accent); opacity: .35; }
+.wchart .avg { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.legend-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); opacity: .4; margin: 0 3px 1px 0; vertical-align: middle; }
+.legend-line { display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--accent); margin: 0 4px 2px 10px; vertical-align: middle; }
+
+/* Focus timer */
+.focus-clock { font-size: 64px; font-weight: 650; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1; margin: 4px 0 10px; color: var(--muted); }
+.focus-clock.on { color: var(--accent); }
+
+/* House */
+.chip.paid { background: var(--done-soft); color: var(--done); font-weight: 600; }
+.report { white-space: pre-wrap; font: 13px/1.6 var(--font); background: var(--panel-2); border-radius: var(--r-sm); padding: 12px 14px; margin: 0; max-height: 340px; overflow: auto; }
+
+.setup { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; background: var(--panel-2); border-radius: var(--r); padding: 14px; }
+.setup input { background: var(--panel); }
+code { font-size: 12.5px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; }

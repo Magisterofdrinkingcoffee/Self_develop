@@ -39,6 +39,9 @@ export default function App() {
   const [notice, setNotice] = useState(null); // { kind: "good"|"bad", text }
   const timer = useRef(null);
   const first = useRef(true);
+  const version = useRef(null); // data.updatedAt of what we last loaded/saved
+  const saveRef = useRef("saved");
+  saveRef.current = save;
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -49,6 +52,7 @@ export default function App() {
       if (!res.ok) throw new Error(json.error || "Load failed");
       if (json.storage) {
         setStorage(true);
+        version.current = json.data?.updatedAt ?? null;
         setData(normalize(json.data));
       } else {
         setStorage(false);
@@ -90,15 +94,48 @@ export default function App() {
         const res = await fetch("/api/data", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
+          body: JSON.stringify({ ...data, _base: version.current }),
         });
         if (res.status === 401) return setStatus("locked");
+        const json = await res.json().catch(() => ({}));
+        if (res.status === 409 && json.data) {
+          // Another device (or a Siri quick-add) saved first: take the newer data
+          version.current = json.data.updatedAt ?? null;
+          first.current = true;
+          setData(normalize(json.data));
+          setNotice({ kind: "bad", text: "This was changed on another device, so the newest version was loaded. Your last edit here wasn't saved; please redo it." });
+          setSave("saved");
+          return;
+        }
+        if (res.ok) version.current = json.updatedAt;
         setSave(res.ok ? "saved" : "error");
       } catch {
         setSave("error");
       }
     }, 700);
   }, [data, storage]);
+
+  // Pick up changes from other devices: when the app comes back to the foreground, and every minute while open
+  useEffect(() => {
+    if (status !== "ready" || !storage) return;
+    const refresh = async () => {
+      if (document.visibilityState !== "visible" || saveRef.current !== "saved") return;
+      try {
+        const res = await fetch("/api/data", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        const v = json.data?.updatedAt ?? null;
+        if (v && v !== version.current && saveRef.current === "saved") {
+          version.current = v;
+          first.current = true;
+          setData(normalize(json.data));
+        }
+      } catch {}
+    };
+    document.addEventListener("visibilitychange", refresh);
+    const iv = setInterval(refresh, 60e3);
+    return () => { document.removeEventListener("visibilitychange", refresh); clearInterval(iv); };
+  }, [status, storage]);
 
   // Warn before closing with unsaved changes
   useEffect(() => {
