@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Bar, Card, Del, Empty, Header, NoteArea, Seg } from "./ui";
 import PdfReader from "./PdfReader";
 import { dateKey, fmtDate, logMinimum, uid } from "@/lib/data";
+import Icon from "./Icon";
 
 // Upload a PDF straight from the browser to Supabase Storage using a signed URL
 async function uploadPdf(file, onProgress) {
@@ -210,7 +211,7 @@ function BookView({ book, data, update, storage, back }) {
 
   return (
     <>
-      <button className="link" onClick={back}>‹ All books</button>
+      <button className="link" onClick={back}><Icon name="left" size={16} />All books</button>
       <header className="pagehead">
         <div className="grow">
           <input className="ghost h1" value={book.title} onChange={(e) => edit({ title: e.target.value })} />

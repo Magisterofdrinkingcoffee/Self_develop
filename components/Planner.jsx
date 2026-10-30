@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Card, Del, Empty, Header, NoteArea } from "./ui";
 import { DAYS, addDays, dateKey, fmtDate, uid, weekStart, weekTotal } from "@/lib/data";
+import Icon from "./Icon";
+import { snapshot } from "@/lib/snapshot";
 
 export default function Planner({ data, update }) {
   const [week, setWeek] = useState(weekStart());
@@ -15,6 +17,30 @@ export default function Planner({ data, update }) {
   const workouts = data.workouts.filter((w) => days.includes(w.date)).length;
   const spent = data.money.filter((m) => days.includes(m.date) && m.type === "expense").reduce((s, m) => s + Number(m.amount || 0), 0);
   const minsMet = data.minimums.filter((m) => weekTotal(data, week, m.id) >= Number(m.target)).length;
+  const studyMin = (data.focus || []).filter((f) => days.includes(f.date)).reduce((s, f) => s + Number(f.minutes || 0), 0);
+  const [draft, setDraft] = useState({ busy: false, err: "" });
+
+  // Gemini writes a first draft of the weekly review from this week's numbers
+  const draftReview = async () => {
+    setDraft({ busy: true, err: "" });
+    try {
+      const r = await fetch("/api/ai/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          snapshot: snapshot(data, [], week),
+          messages: [{ role: "user", text: `Write my weekly review for ${fmtDate(week, { day: "numeric", month: "long" })} to ${fmtDate(days[6], { day: "numeric", month: "long" })}, in first person, as if I wrote it. Use the week's real numbers. Three short parts with these plain labels on their own line: "Wins:", "Slipped:", "Focus next week:". 120 to 180 words. Plain text, no markdown, no asterisks.` }],
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Couldn't draft the review");
+      const text = String(j.reply).replace(/\*\*/g, "").trim();
+      update((d) => { d.weekly[week] = d.weekly[week] ? `${d.weekly[week]}\n\n${text}` : text; });
+      setDraft({ busy: false, err: "" });
+    } catch (e) {
+      setDraft({ busy: false, err: String(e.message || e) });
+    }
+  };
 
   return (
     <>
@@ -23,9 +49,9 @@ export default function Planner({ data, update }) {
         sub={`Week of ${fmtDate(week, { day: "numeric", month: "long" })} – ${fmtDate(days[6], { day: "numeric", month: "long" })}`}
         right={
           <div className="daynav">
-            <button className="btn" onClick={() => setWeek(addDays(week, -7))} aria-label="Previous week">‹</button>
+            <button className="btn" onClick={() => setWeek(addDays(week, -7))} aria-label="Previous week"><Icon name="left" size={17} /></button>
             {!isThisWeek && <button className="btn" onClick={() => setWeek(weekStart())}>This week</button>}
-            <button className="btn" onClick={() => setWeek(addDays(week, 7))} aria-label="Next week">›</button>
+            <button className="btn" onClick={() => setWeek(addDays(week, 7))} aria-label="Next week"><Icon name="right" size={17} /></button>
           </div>
         }
       />
@@ -33,6 +59,7 @@ export default function Planner({ data, update }) {
       <div className="stats">
         <div className="stat"><span className="muted small">Minimums met</span><strong>{minsMet} / {data.minimums.length}</strong></div>
         <div className="stat"><span className="muted small">Tasks done</span><strong>{todosDone} / {todosIn.length}</strong></div>
+        <div className="stat"><span className="muted small">Study time</span><strong>{Math.floor(studyMin / 60)}h {studyMin % 60}m</strong></div>
         <div className="stat"><span className="muted small">Workouts</span><strong>{workouts} / {data.settings.workoutsPerWeek}</strong></div>
         <div className="stat"><span className="muted small">Spent this week</span><strong>{data.settings.currency} {spent.toFixed(2)}</strong></div>
       </div>
@@ -68,7 +95,8 @@ export default function Planner({ data, update }) {
       </Card>
 
       <div className="grid2">
-        <Card title="Weekly summary">
+        <Card title="Weekly summary" right={<button className="link" onClick={draftReview} disabled={draft.busy}><Icon name="coach" size={15} />{draft.busy ? "Writing…" : "Draft with AI"}</button>}>
+          {draft.err && <p className="err small" style={{ marginBottom: 8 }}>{draft.err}</p>}
           <NoteArea
             rows={9}
             value={data.weekly[week]}

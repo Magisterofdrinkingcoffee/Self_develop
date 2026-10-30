@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { Bar, Card, Del, Empty, Header, Seg } from "./ui";
 import { dateKey, fmtDate, money, monthKey, uid } from "@/lib/data";
+import Icon from "./Icon";
+import House from "./House";
 
 export default function Finance({ data, update }) {
   const cats = data.settings.categories;
   const cur = data.settings.currency;
   const [month, setMonth] = useState(monthKey());
+  const [view, setView] = useState("me");
   const [f, setF] = useState({ type: "expense", date: dateKey(), amount: "", category: cats[0] || "Other", note: "" });
 
   const add = (e) => {
@@ -41,12 +44,16 @@ export default function Finance({ data, update }) {
         sub={monthName}
         right={
           <div className="daynav">
-            <button className="btn" onClick={() => shiftMonth(-1)} aria-label="Previous month">‹</button>
+            <button className="btn" onClick={() => shiftMonth(-1)} aria-label="Previous month"><Icon name="left" size={17} /></button>
             {month !== monthKey() && <button className="btn" onClick={() => setMonth(monthKey())}>This month</button>}
-            <button className="btn" onClick={() => shiftMonth(1)} aria-label="Next month">›</button>
+            <button className="btn" onClick={() => shiftMonth(1)} aria-label="Next month"><Icon name="right" size={17} /></button>
           </div>
         }
       />
+      <div style={{ marginBottom: 14 }}>
+        <Seg value={view} onChange={setView} options={[{ value: "me", label: "My money" }, { value: "house", label: data.house?.name || "House" }]} />
+      </div>
+      {view === "house" ? <House data={data} update={update} month={month} /> : <>
       <div className="stats">
         <div className="stat"><span className="muted small">Income</span><strong className="pos">{money(income, cur)}</strong></div>
         <div className="stat"><span className="muted small">Spent</span><strong className="neg">{money(expense, cur)}</strong></div>
@@ -96,6 +103,7 @@ export default function Finance({ data, update }) {
           </ul>
         </Card>
       </div>
+      </>}
     </>
   );
 }
