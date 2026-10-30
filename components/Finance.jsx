@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Bar, Card, Del, Empty, Header, Seg } from "./ui";
 import { dateKey, fmtDate, money, monthKey, uid } from "@/lib/data";
+import Icon from "./Icon";
 
 export default function Finance({ data, update }) {
   const cats = data.settings.categories;
@@ -41,9 +42,9 @@ export default function Finance({ data, update }) {
         sub={monthName}
         right={
           <div className="daynav">
-            <button className="btn" onClick={() => shiftMonth(-1)} aria-label="Previous month">‹</button>
+            <button className="btn" onClick={() => shiftMonth(-1)} aria-label="Previous month"><Icon name="left" size={17} /></button>
             {month !== monthKey() && <button className="btn" onClick={() => setMonth(monthKey())}>This month</button>}
-            <button className="btn" onClick={() => shiftMonth(1)} aria-label="Next month">›</button>
+            <button className="btn" onClick={() => shiftMonth(1)} aria-label="Next month"><Icon name="right" size={17} /></button>
           </div>
         }
       />

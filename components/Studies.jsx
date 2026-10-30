@@ -3,12 +3,52 @@
 import { useState } from "react";
 import { Card, Del, Empty, Header, NoteArea } from "./ui";
 import { dateKey, fmtDate, parseKey, uid } from "@/lib/data";
+import Icon from "./Icon";
+import { localDay } from "@/lib/useRemote";
 
 export default function Studies({ data, update }) {
   const today = dateKey();
   const [f, setF] = useState({ title: "", subjectId: "", due: today });
   const [sub, setSub] = useState({ code: "", name: "" });
   const [showDone, setShowDone] = useState(false);
+  const [sync, setSync] = useState({ busy: false, msg: "" });
+
+  // Pull assignment/quiz dates from the Moodle calendar feed into Deadlines
+  const syncMoodle = async () => {
+    setSync({ busy: true, msg: "" });
+    try {
+      const from = new Date(Date.now() - 7 * 864e5).toISOString();
+      const to = new Date(Date.now() + 150 * 864e5).toISOString();
+      const r = await fetch(`/api/agenda?kind=moodle&from=${from}&to=${to}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Sync failed");
+      if (j.errors?.length) throw new Error(j.errors.join(" · "));
+      if (!j.events.length) {
+        setSync({ busy: false, msg: "No Moodle events found. Add your Moodle calendar link in Settings → Connections." });
+        return;
+      }
+      let added = 0, changed = 0;
+      update((d) => {
+        for (const e of j.events) {
+          const key = e.uid || e.id;
+          const due = localDay(e.start);
+          const hay = `${e.categories} ${e.title} ${e.description}`.toLowerCase();
+          const subj = d.subjects.find((s) => s.code && hay.includes(s.code.toLowerCase()));
+          const title = e.title;
+          const ex = d.deadlines.find((x) => x.uid === key);
+          if (ex) {
+            if (ex.due !== due || ex.title !== title) { ex.due = due; ex.title = title; changed++; }
+          } else {
+            d.deadlines.push({ id: uid(), uid: key, source: "moodle", title, subjectId: subj?.id || "", due, done: false });
+            added++;
+          }
+        }
+      });
+      setSync({ busy: false, msg: `Moodle synced: ${added} new, ${changed} updated.` });
+    } catch (e) {
+      setSync({ busy: false, msg: String(e.message || e) });
+    }
+  };
 
   const addDeadline = (e) => {
     e.preventDefault();
@@ -35,8 +75,14 @@ export default function Studies({ data, update }) {
 
       <Card
         title="Deadlines"
-        right={<label className="small muted toggle"><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Show done</label>}
+        right={
+          <div className="row wrapgap">
+            <button className="link" onClick={syncMoodle} disabled={sync.busy}><Icon name="sync" size={15} />{sync.busy ? "Syncing…" : "Sync Moodle"}</button>
+            <label className="small muted toggle"><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Show done</label>
+          </div>
+        }
       >
+        {sync.msg && <p className="small muted" style={{ marginBottom: 10 }}>{sync.msg}</p>}
         <form className="formgrid" onSubmit={addDeadline}>
           <input placeholder="Assignment, quiz, exam…" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
           <select value={f.subjectId} onChange={(e) => setF({ ...f, subjectId: e.target.value })}>
@@ -54,9 +100,10 @@ export default function Studies({ data, update }) {
             const tag = d.done ? "Done" : days < 0 ? `${-days}d late` : days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d`;
             return (
               <li key={d.id} className={d.done ? "done" : ""}>
-                <button className="check" onClick={() => edit("deadlines", d.id, { done: !d.done })} aria-label="Toggle done">{d.done ? "✓" : ""}</button>
+                <button className="check" onClick={() => edit("deadlines", d.id, { done: !d.done })} aria-label="Toggle done">{d.done && <Icon name="check" size={15} strokeWidth="3" />}</button>
                 <span className="grow">
                   <strong>{d.title}</strong>
+                  {d.source === "moodle" && <span className="pill warn" style={{ marginLeft: 6 }}>Moodle</span>}
                   <span className="muted small"> · {s ? s.code || s.name : "General"} · {fmtDate(d.due, { weekday: "short", day: "numeric", month: "short" })}</span>
                 </span>
                 <span className={`pill ${!d.done && days <= 2 ? "warn" : ""}`}>{tag}</span>

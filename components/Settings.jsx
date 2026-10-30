@@ -1,8 +1,135 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Icon from "./Icon";
+import { clearRemote } from "@/lib/useRemote";
 import { Card, Del, Header } from "./ui";
 import { dateKey, normalize, uid } from "@/lib/data";
+
+function Connections({ storage }) {
+  const [st, setSt] = useState(null);
+  const [err, setErr] = useState("");
+  const [feed, setFeed] = useState({ kind: "moodle", name: "", url: "" });
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState("");
+
+  const load = useCallback(async () => {
+    if (!storage) return;
+    const r = await fetch("/api/integrations", { cache: "no-store" }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    if (r?.ok) setSt(j); else setErr(j?.error || "Couldn't load connections");
+  }, [storage]);
+  useEffect(() => { load(); }, [load]);
+
+  const post = async (body, label) => {
+    setErr("");
+    setBusy(label);
+    try {
+      const r = await fetch("/api/integrations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Failed");
+      clearRemote();
+      await load();
+      return true;
+    } catch (e) {
+      setErr(String(e.message || e));
+      return false;
+    } finally {
+      setBusy("");
+    }
+  };
+  const disconnect = async (p) => {
+    if (!confirm("Disconnect this account?")) return;
+    await fetch(`/api/connect/${p}`, { method: "DELETE" });
+    clearRemote();
+    load();
+  };
+
+  if (!storage) return <Card title="Connections"><p className="muted small">Connect Supabase first. Accounts and keys are stored there, server-side.</p></Card>;
+
+  const Acc = ({ id, logo, cls, name, what }) => {
+    const a = st?.[id];
+    return (
+      <div className="conn">
+        <span className={`logo ${cls}`}>{logo}</span>
+        <div className="grow">
+          <strong>{name}</strong>
+          <div className="muted small">{a?.connected ? `Connected${a.email ? ` as ${a.email}` : ""}` : what}</div>
+        </div>
+        {a?.connected ? (
+          <button className="btn danger" onClick={() => disconnect(id)}>Disconnect</button>
+        ) : (
+          <a className="btn primary" href={`/api/connect/${id}`}>{a && !a.configured ? "Set up" : "Connect"}</a>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <Card title={<><Icon name="link" size={18} />Connections</>}>
+        <Acc id="google" logo="G" cls="g" name="Google" what="Calendar events and unread Gmail on Today" />
+        <Acc id="microsoft" logo="O" cls="o" name="Outlook" what="Outlook calendar and unread mail (personal or university account)" />
+        {(st?.feeds || []).map((f) => (
+          <div key={f.id} className="conn">
+            <span className={`logo ${f.kind === "moodle" ? "m" : "c"}`}>{f.kind === "moodle" ? "M" : <Icon name="calendar" size={18} />}</span>
+            <div className="grow" style={{ minWidth: 0 }}>
+              <strong>{f.name}</strong>
+              <div className="muted small ellipsis">{f.url}</div>
+            </div>
+            <button className="btn danger" onClick={() => confirm(`Remove ${f.name}?`) && post({ action: "removeFeed", id: f.id }, "rm")}>Remove</button>
+          </div>
+        ))}
+        <form className="conn" onSubmit={async (e) => { e.preventDefault(); if (await post({ action: "addFeed", ...feed }, "feed")) setFeed({ kind: "moodle", name: "", url: "" }); }}>
+          <span className="logo m">+</span>
+          <div className="grow stack" style={{ gap: 8 }}>
+            <strong>Add a calendar link</strong>
+            <div className="formgrid tight">
+              <select value={feed.kind} onChange={(e) => setFeed({ ...feed, kind: e.target.value })} aria-label="Type">
+                <option value="moodle">Moodle</option>
+                <option value="calendar">Other calendar (.ics)</option>
+              </select>
+              <input placeholder="Name (optional)" value={feed.name} onChange={(e) => setFeed({ ...feed, name: e.target.value })} />
+            </div>
+            <input placeholder="https://… or webcal://… link" value={feed.url} onChange={(e) => setFeed({ ...feed, url: e.target.value })} />
+            <details className="help">
+              <summary>Where do I get the Moodle link?</summary>
+              <ol className="howto">
+                <li>In Moodle, open Calendar, then Import or export calendars, then Export calendar.</li>
+                <li>Choose Events to export: All, and Time period: Recent and next 60 days.</li>
+                <li>Click Get calendar URL and paste it here.</li>
+              </ol>
+              <p className="muted small" style={{ marginTop: 6 }}>Works for any .ics link too, e.g. an Outlook "Publish calendar" link if your university blocks the Connect button.</p>
+            </details>
+          </div>
+          <button className="btn primary" disabled={!feed.url.trim() || busy === "feed"}>{busy === "feed" ? "Checking…" : "Add"}</button>
+        </form>
+        {err && <p className="err">{err}</p>}
+      </Card>
+
+      <Card title={<><Icon name="coach" size={18} />AI (Gemini)</>}>
+        <div className="conn">
+          <span className="logo ai"><Icon name="coach" size={18} /></span>
+          <div className="grow">
+            <strong>Gemini API key</strong>
+            <div className="muted small">
+              {st?.gemini?.connected
+                ? st.gemini.fromEnv ? "Set in Vercel (GEMINI_API_KEY)." : "Saved. Used for calorie estimates and the Coach."
+                : "Powers calorie estimates from text or photos, and the Coach. The key stays on the server."}
+            </div>
+          </div>
+          {st?.gemini?.connected && !st.gemini.fromEnv && <button className="btn danger" onClick={() => post({ action: "removeGeminiKey" }, "k")}>Remove</button>}
+        </div>
+        {!st?.gemini?.connected && (
+          <form className="addrow" onSubmit={async (e) => { e.preventDefault(); if (await post({ action: "setGeminiKey", key }, "key")) setKey(""); }}>
+            <input type="password" placeholder="Paste key from aistudio.google.com/apikey" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />
+            <button className="btn primary" disabled={key.length < 20 || busy === "key"}>{busy === "key" ? "Checking…" : "Save"}</button>
+          </form>
+        )}
+      </Card>
+    </>
+  );
+}
 
 export default function Settings({ data, update, storage }) {
   const [m, setM] = useState({ name: "", target: "", unit: "pages" });
@@ -51,7 +178,9 @@ export default function Settings({ data, update, storage }) {
 
   return (
     <>
-      <Header title="Settings" sub="Minimums, targets and backups" />
+      <Header title="Settings" sub="Connected accounts, minimums, targets and backups" />
+
+      <Connections storage={storage} />
 
       <Card title="Weekly minimums">
         <p className="muted small">Targets are per week (Monday–Sunday). Log what you do each day on Today and it adds up toward the week.</p>
@@ -109,6 +238,13 @@ export default function Settings({ data, update, storage }) {
           </form>
         </Card>
       </div>
+
+      <Card title="Install as an app">
+        <ul className="howto" style={{ paddingLeft: 18 }}>
+          <li><strong>iPhone:</strong> open this site in Safari, tap Share, then Add to Home Screen.</li>
+          <li><strong>Mac or Windows:</strong> in Chrome or Edge, click the install icon at the right end of the address bar.</li>
+        </ul>
+      </Card>
 
       <Card title="Data">
         <p className="muted small">

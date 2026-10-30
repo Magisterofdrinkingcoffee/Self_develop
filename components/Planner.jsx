@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, Del, Empty, Header, NoteArea } from "./ui";
 import { DAYS, addDays, dateKey, fmtDate, uid, weekStart, weekTotal } from "@/lib/data";
+import Icon from "./Icon";
 
 export default function Planner({ data, update }) {
   const [week, setWeek] = useState(weekStart());
@@ -23,9 +24,9 @@ export default function Planner({ data, update }) {
         sub={`Week of ${fmtDate(week, { day: "numeric", month: "long" })} – ${fmtDate(days[6], { day: "numeric", month: "long" })}`}
         right={
           <div className="daynav">
-            <button className="btn" onClick={() => setWeek(addDays(week, -7))} aria-label="Previous week">‹</button>
+            <button className="btn" onClick={() => setWeek(addDays(week, -7))} aria-label="Previous week"><Icon name="left" size={17} /></button>
             {!isThisWeek && <button className="btn" onClick={() => setWeek(weekStart())}>This week</button>}
-            <button className="btn" onClick={() => setWeek(addDays(week, 7))} aria-label="Next week">›</button>
+            <button className="btn" onClick={() => setWeek(addDays(week, 7))} aria-label="Next week"><Icon name="right" size={17} /></button>
           </div>
         }
       />

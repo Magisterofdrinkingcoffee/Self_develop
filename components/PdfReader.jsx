@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Icon from "./Icon";
 
 // Reads a PDF page by page. Calls onPage(page, numPages) whenever the page changes.
 export default function PdfReader({ path, title, startPage = 1, onPage, onClose }) {
@@ -102,7 +103,7 @@ export default function PdfReader({ path, title, startPage = 1, onPage, onClose 
   return (
     <div className="reader">
       <div className="readerbar">
-        <button className="btn" onClick={onClose}>‹ Close</button>
+        <button className="btn" onClick={onClose}><Icon name="left" size={17} />Close</button>
         <strong className="grow ellipsis">{title}</strong>
         <div className="row">
           <button className="btn" onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.2).toFixed(1)))} aria-label="Zoom out">−</button>
@@ -119,12 +120,12 @@ export default function PdfReader({ path, title, startPage = 1, onPage, onClose 
       </div>
       {state === "ready" && (
         <div className="readernav">
-          <button className="btn" onClick={() => go(page - 1)} disabled={page <= 1}>‹ Prev</button>
+          <button className="btn" onClick={() => go(page - 1)} disabled={page <= 1}><Icon name="left" size={17} />Prev</button>
           <form onSubmit={(e) => { e.preventDefault(); go(Number(input) || 1); }} className="row">
             <input className="pagein" type="number" inputMode="numeric" value={input} onChange={(e) => setInput(e.target.value)} />
             <span className="muted">/ {num}</span>
           </form>
-          <button className="btn primary" onClick={() => go(page + 1)} disabled={page >= num}>Next ›</button>
+          <button className="btn primary" onClick={() => go(page + 1)} disabled={page >= num}>Next<Icon name="right" size={17} /></button>
         </div>
       )}
     </div>

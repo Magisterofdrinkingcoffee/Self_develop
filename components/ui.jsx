@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Icon from "./Icon";
 
 export function Card({ title, right, children, className = "" }) {
   return (
@@ -63,7 +64,7 @@ export function Del({ onClick, label = "Delete" }) {
       aria-label={label}
       onClick={() => { if (confirm(`${label}?`)) onClick(); }}
     >
-      ×
+      <Icon name="close" size={15} />
     </button>
   );
 }
