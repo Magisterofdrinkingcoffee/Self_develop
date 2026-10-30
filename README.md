@@ -28,15 +28,15 @@ The site works right away, but at this point data is saved only in the browser y
 2. Supabase → Project Settings → Integrations → **Vercel** → connect the project to this Vercel project. This adds `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` automatically.
 
 ### 4. Login (only you)
-**iPhone Home Screen app:** it keeps its own login, separate from Safari, so an email link opened on the phone signs in Safari, not the app. Instead: sign in anywhere (Safari or your laptop) → **Settings → Sign in another device → Show a pairing code** → in the app tap "Sign in with a code from another device" and type it. Codes work once and expire after 10 minutes.
-
-The whole site is private. You sign in with your email and get a one-click login link from Supabase; the session lasts 90 days.
-- Only the owner's email (stored as a hash in `lib/server.js`) and any emails in the optional `ALLOWED_EMAIL` env var can log in. Anyone else never even gets an email.
-- In Supabase → Authentication → URL Configuration, set **Site URL** to your site (e.g. `https://self-develop-murex.vercel.app`) and add `https://self-develop-murex.vercel.app/**` to **Redirect URLs**, so the login link comes back to the site.
+Sign in with your username and password. The session lasts 90 days on each device (including the iPhone Home Screen app). After 5 wrong passwords, login locks for 15 minutes.
+- The repo holds only a salted scrypt hash of the password, never the password itself.
+- To change the password: generate a new hash with
+  `node -e "const c=require('crypto'),s=c.randomBytes(16);console.log('scrypt$65536$'+s.toString('base64url')+'$'+c.scryptSync(process.argv[1],s,32,{N:65536,r:8,p:1,maxmem:268435456}).toString('base64url'))" 'NEW-PASSWORD'`
+  and put it in Vercel as `LOGIN_PASSWORD_HASH` (optional `LOGIN_USER` for a different username).
 - "Log out" is in Settings.
 
 ## Install it as an app
-- **iPhone:** open the site in Safari → Share → **Add to Home Screen**. It opens full screen with its own icon. Sign in with a pairing code (see Login).
+- **iPhone:** open the site in Safari → Share → **Add to Home Screen**. It opens full screen with its own icon. Sign in once with your username and password.
 - **Mac / Windows:** open the site in Chrome or Edge → click the install icon at the right end of the address bar.
 
 ## Connections (Settings → Connections)
@@ -87,6 +87,7 @@ Settings → Siri and quick add → **Show setup** gives the URL, a private toke
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, optional `MS_TENANT` (or paste in Settings) | Outlook |
 | `GEMINI_API_KEY` (or paste in Settings), optional `GEMINI_MODEL` | Calorie estimates, Coach, weekly review, Siri meal estimates |
 | `SESSION_SECRET` (optional) | Signs login cookies (defaults to the Supabase key) |
+| `LOGIN_USER`, `LOGIN_PASSWORD_HASH` (optional) | Change the username/password |
 | `CRON_SECRET` (optional) | Locks the daily notification cron URL |
 
 ## Run locally
