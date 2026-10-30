@@ -248,7 +248,7 @@ export default function App() {
 function Login() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [state, setState] = useState("idle"); // idle | sending | sent | verifying
+  const [state, setState] = useState("idle"); // idle | sending | sent | pair | verifying
   const [err, setErr] = useState("");
   const post = (body) =>
     fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
@@ -264,36 +264,48 @@ function Login() {
       setState("idle");
     }
   };
-  const verify = async (e) => {
+  const pair = async (e) => {
     e.preventDefault();
     setErr("");
     setState("verifying");
-    const res = await post({ email, code });
+    const res = await post({ pair: code });
     if (res?.ok) location.reload();
     else {
       setErr((await res?.json().catch(() => ({})))?.error || "That code didn't work");
-      setState("sent");
+      setState("pair");
     }
   };
+  const brand = <div className="brand big"><img src="/icons/icon-192.png" alt="" />Life</div>;
 
-  if (state === "sent" || state === "verifying")
+  if (state === "pair" || state === "verifying")
     return (
-      <form className="center login" onSubmit={verify}>
-        <div className="brand big"><img src="/icons/icon-192.png" alt="" />Life</div>
-        <p className="center-msg muted">If <strong>{email}</strong> has access, an email is on its way. Type the code from it here, or open its link on this device.</p>
-        <input className="code" inputMode="numeric" autoComplete="one-time-code" placeholder="Code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} autoFocus maxLength={10} />
-        <button className="btn primary" disabled={code.length < 6 || state === "verifying"}>{state === "verifying" ? "Signing in…" : "Sign in"}</button>
+      <form className="center login" onSubmit={pair}>
+        {brand}
+        <p className="center-msg muted">On a device where you're signed in, open Settings → Sign in another device, then type the 6-digit code here.</p>
+        <input className="code" inputMode="numeric" autoComplete="one-time-code" placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} autoFocus />
+        <button className="btn primary" disabled={code.length !== 6 || state === "verifying"}>{state === "verifying" ? "Signing in…" : "Sign in"}</button>
         {err && <p className="err">{err}</p>}
-        <button type="button" className="link" onClick={() => { setState("idle"); setCode(""); }}>Use a different email</button>
+        <button type="button" className="link" onClick={() => { setState("idle"); setErr(""); }}>Back</button>
       </form>
+    );
+  if (state === "sent")
+    return (
+      <div className="center login">
+        {brand}
+        <p className="center-msg">If <strong>{email}</strong> has access, a sign-in link is on its way. Open it on this device.</p>
+        <p className="center-msg muted small">Using the app from your iPhone Home Screen? The link opens in Safari instead. Sign in there, then use a pairing code here.</p>
+        <button className="btn" onClick={() => setState("pair")}>I have a pairing code</button>
+        <button className="link" onClick={() => setState("idle")}>Use a different email</button>
+      </div>
     );
   return (
     <form className="center login" onSubmit={submit}>
-      <div className="brand big"><img src="/icons/icon-192.png" alt="" />Life</div>
+      {brand}
       <p className="muted">Private. Sign in to continue.</p>
       <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus required autoComplete="email" />
-      <button className="btn primary" type="submit" disabled={state === "sending"}>{state === "sending" ? "Sending…" : "Email me a sign-in code"}</button>
+      <button className="btn primary" type="submit" disabled={state === "sending"}>{state === "sending" ? "Sending…" : "Email me a sign-in link"}</button>
       {err && <p className="err">{err}</p>}
+      <button type="button" className="link" onClick={() => { setState("pair"); setErr(""); }}>Sign in with a code from another device</button>
     </form>
   );
 }

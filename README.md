@@ -28,13 +28,7 @@ The site works right away, but at this point data is saved only in the browser y
 2. Supabase → Project Settings → Integrations → **Vercel** → connect the project to this Vercel project. This adds `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` automatically.
 
 ### 4. Login (only you)
-**Do this once so login works inside the iPhone app:** Supabase → Authentication → Emails → **Magic Link** template, add the code to the email body, e.g.
-
-```html
-<p>Your code: <strong>{{ .Token }}</strong></p>
-<p>Or <a href="{{ .ConfirmationURL }}">open this link</a> on the same device.</p>
-```
-An app added to the iPhone Home Screen keeps its own login, separate from Safari, so the link would sign in Safari instead of the app. Typing the code signs in the app itself.
+**iPhone Home Screen app:** it keeps its own login, separate from Safari, so an email link opened on the phone signs in Safari, not the app. Instead: sign in anywhere (Safari or your laptop) → **Settings → Sign in another device → Show a pairing code** → in the app tap "Sign in with a code from another device" and type it. Codes work once and expire after 10 minutes.
 
 The whole site is private. You sign in with your email and get a one-click login link from Supabase; the session lasts 90 days.
 - Only the owner's email (stored as a hash in `lib/server.js`) and any emails in the optional `ALLOWED_EMAIL` env var can log in. Anyone else never even gets an email.
@@ -42,7 +36,7 @@ The whole site is private. You sign in with your email and get a one-click login
 - "Log out" is in Settings.
 
 ## Install it as an app
-- **iPhone:** open the site in Safari → Share → **Add to Home Screen**. It opens full screen with its own icon. Sign in with the emailed code.
+- **iPhone:** open the site in Safari → Share → **Add to Home Screen**. It opens full screen with its own icon. Sign in with a pairing code (see Login).
 - **Mac / Windows:** open the site in Chrome or Edge → click the install icon at the right end of the address bar.
 
 ## Connections (Settings → Connections)

@@ -254,6 +254,38 @@ function QuickAdd({ storage, data }) {
   );
 }
 
+function Pairing() {
+  const [c, setC] = useState(null);
+  const [left, setLeft] = useState(0);
+  useEffect(() => {
+    if (!c) return;
+    const iv = setInterval(() => {
+      const l = Math.max(0, Math.round((c.exp - Date.now()) / 1000));
+      setLeft(l);
+      if (!l) setC(null);
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [c]);
+  const make = async () => {
+    const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "pair-create" }) }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    if (j?.code) { setC({ code: j.code, exp: Date.now() + j.minutes * 60e3 }); setLeft(j.minutes * 60); }
+  };
+  return (
+    <Card title="Sign in another device">
+      <p className="muted small">For the iPhone Home Screen app: on its sign-in screen tap "Sign in with a code from another device", then type this code.</p>
+      {c ? (
+        <div className="row wrap" style={{ marginTop: 12 }}>
+          <span className="pair-code">{c.code.slice(0, 3)} {c.code.slice(3)}</span>
+          <span className="muted small">Works once, {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")} left</span>
+        </div>
+      ) : (
+        <button className="btn" style={{ marginTop: 12 }} onClick={make}>Show a pairing code</button>
+      )}
+    </Card>
+  );
+}
+
 function Prayer({ data, update }) {
   const s = data.settings;
   const setS = (patch) => update((d) => { Object.assign(d.settings, patch); });
@@ -406,14 +438,17 @@ export default function Settings({ data, update, storage }) {
         <QuickAdd storage={storage} data={data} />
       </div>
 
-      <Prayer data={data} update={update} />
+      <div className="grid2">
+        <Pairing />
+        <Card title="Install as an app">
+          <ul className="howto" style={{ paddingLeft: 18 }}>
+            <li><strong>iPhone:</strong> open this site in Safari, tap Share, then Add to Home Screen. Open it, then sign in with a pairing code from here.</li>
+            <li><strong>Mac or Windows:</strong> in Chrome or Edge, click the install icon at the right end of the address bar.</li>
+          </ul>
+        </Card>
+      </div>
 
-      <Card title="Install as an app">
-        <ul className="howto" style={{ paddingLeft: 18 }}>
-          <li><strong>iPhone:</strong> open this site in Safari, tap Share, then Add to Home Screen.</li>
-          <li><strong>Mac or Windows:</strong> in Chrome or Edge, click the install icon at the right end of the address bar.</li>
-        </ul>
-      </Card>
+      <Prayer data={data} update={update} />
 
       <Card title="Data">
         <p className="muted small">

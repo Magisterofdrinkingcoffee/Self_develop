@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { COOKIE, emailFromCode, emailFromToken, isAllowed, makeSession, sendLoginLink, storageEnabled } from "@/lib/server";
+import { COOKIE, createPairCode, emailFromCode, emailFromToken, isAllowed, isAuthed, makeSession, sendLoginLink, sessionEmail, storageEnabled, usePairCode } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,21 @@ export const dynamic = "force-dynamic";
 export async function POST(req) {
   if (!storageEnabled()) return NextResponse.json({ error: "Supabase isn't connected" }, { status: 500 });
   const body = await req.json().catch(() => ({}));
+
+  // Signed-in device asks for a pairing code
+  if (body.action === "pair-create") {
+    if (!(await isAuthed())) return NextResponse.json({ error: "locked" }, { status: 401 });
+    return NextResponse.json({ code: await createPairCode(await sessionEmail()), minutes: 10 });
+  }
+  // New device signs in with that code
+  if (body.pair) {
+    const email = await usePairCode(String(body.pair).replace(/\D/g, ""));
+    if (!email || !isAllowed(email)) return NextResponse.json({ error: "That code is wrong or expired. Make a new one on your signed-in device." }, { status: 400 });
+    const { value, maxAge } = await makeSession(email);
+    const res = NextResponse.json({ ok: true });
+    res.cookies.set(COOKIE, value, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge });
+    return res;
+  }
 
   if (body.access_token || body.code) {
     const email = body.code
