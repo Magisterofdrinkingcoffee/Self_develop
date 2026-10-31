@@ -13,11 +13,6 @@ const PROMPTS = [
   { q: "Should I add weight on bench press?", sub: "Progressive overload from your log" },
 ];
 
-const LANGS = [
-  { v: "en-US", l: "EN" },
-  { v: "ru-RU", l: "RU" },
-  { v: "kk-KZ", l: "KZ" },
-];
 
 const store = {
   get: (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -49,6 +44,40 @@ async function shrink(file, max = 1280) {
   return { mime: "image/jpeg", data: url.split(",")[1], preview: url };
 }
 
+// Voice: record with the microphone and convert to a small 16 kHz mono WAV, which Gemini understands directly.
+// No phone dictation or Siri needed, and it works in Kazakh too.
+function toWav(buf, rate) {
+  const data = buf.getChannelData(0);
+  const out = new DataView(new ArrayBuffer(44 + data.length * 2));
+  const w = (o, str) => [...str].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); out.setUint32(4, 36 + data.length * 2, true); w(8, "WAVE"); w(12, "fmt ");
+  out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+  w(36, "data"); out.setUint32(40, data.length * 2, true);
+  for (let i = 0; i < data.length; i++) out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, data[i])) * 0x7fff, true);
+  return out.buffer;
+}
+
+async function blobToWavBase64(blob) {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  const ab = await blob.arrayBuffer();
+  // Callback form for older Safari, promise form everywhere else
+  const decoded = await new Promise((ok, bad) => { const p = ctx.decodeAudioData(ab, ok, bad); if (p?.then) p.then(ok, bad); });
+  ctx.close?.();
+  const rate = 16000;
+  const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * rate), rate);
+  const src = off.createBufferSource();
+  src.buffer = decoded;
+  src.connect(off.destination);
+  src.start();
+  const wav = toWav(await off.startRendering(), rate);
+  let bin = "";
+  const bytes = new Uint8Array(wav);
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
 const plainForSpeech = (t) => String(t).replace(/\*\*/g, "").replace(/^\s*[-*•]\s+/gm, "").replace(/#+\s*/g, "");
 
 export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
@@ -61,16 +90,15 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
   const [err, setErr] = useState("");
   const [listening, setListening] = useState(false);
   const [speak, setSpeak] = useState(false);
-  const [lang, setLang] = useState("en-US");
   const [undone, setUndone] = useState({});
   const [showMem, setShowMem] = useState(false);
   const endRef = useRef(null);
   const recRef = useRef(null);
   const fileRef = useRef(null);
   const name = data.settings.jarvis?.voiceName || "Jarvis";
-  const canListen = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const canListen = typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
 
-  useEffect(() => { setSpeak(store.get("jarvis-speak", false)); setLang(store.get("jarvis-lang", "en-US")); }, []);
+  useEffect(() => { setSpeak(store.get("jarvis-speak", false)); }, []);
 
   const load = useCallback(async () => {
     if (!storage) return;
@@ -85,15 +113,15 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
     if (!speak || typeof speechSynthesis === "undefined") return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(plainForSpeech(text));
-    u.lang = lang;
+    u.lang = /[а-яёәіңғүұқөһ]/i.test(text) ? "ru-RU" : "en-US";
     speechSynthesis.speak(u);
   };
 
   const send = async (q, opts = {}) => {
     const text = (q ?? input).trim() || (image ? "Log this meal" : "");
-    if (!text || busy) return;
+    if ((!text && !opts.audio) || busy) return;
     const img = image;
-    setTurns((t) => [...t, { role: "user", text, at: new Date().toISOString(), image: !!img, preview: img?.preview }]);
+    setTurns((t) => [...t, { role: "user", text: text || "🎤 Voice message", at: new Date().toISOString(), image: !!img, preview: img?.preview }]);
     setInput("");
     setImage(null);
     setErr("");
@@ -102,7 +130,7 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
       const r = await fetch("/api/jarvis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: !!opts.voice, ...(img ? { image: { mime: img.mime, data: img.data } } : {}) }),
+        body: JSON.stringify({ text, voice: !!opts.voice, ...(img ? { image: { mime: img.mime, data: img.data } } : {}), ...(opts.audio ? { audio: opts.audio } : {}) }),
       });
       const j = await r.json().catch(() => ({}));
       if (r.status === 401) throw new Error("Signed out. Reload the app.");
@@ -128,24 +156,37 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
     } else setErr(j?.error || "Couldn't undo");
   };
 
-  const listen = () => {
+  // Tap once to start recording, tap again to send (stops by itself after 60 s)
+  const listen = async () => {
     if (listening) { recRef.current?.stop(); return; }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const rec = new SR();
-    rec.lang = lang;
-    rec.interimResults = true;
-    rec.continuous = false;
-    let final = "";
-    rec.onresult = (e) => {
-      let interim = "";
-      for (const res of e.results) (res.isFinal ? (final = res[0].transcript) : (interim += res[0].transcript));
-      setInput(final || interim);
+    setErr("");
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setErr("Microphone is blocked. Allow it for this site in Settings → Safari → Microphone (or in your browser), then try again.");
+      return;
+    }
+    const rec = new MediaRecorder(stream);
+    const chunks = [];
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      clearTimeout(rec._limit);
+      setListening(false);
+      const blob = new Blob(chunks, { type: rec.mimeType || "audio/mp4" });
+      if (blob.size < 2000) return;
+      try {
+        const data = await blobToWavBase64(blob);
+        send("", { voice: speak, audio: { mime: "audio/wav", data } });
+      } catch {
+        setErr("Couldn't process the recording. Try again, or type it.");
+      }
     };
-    rec.onerror = (e) => { setListening(false); if (e.error !== "no-speech" && e.error !== "aborted") setErr(`Microphone: ${e.error}`); };
-    rec.onend = () => { setListening(false); if (final.trim()) send(final, { voice: speak }); };
     recRef.current = rec;
-    setListening(true);
     rec.start();
+    rec._limit = setTimeout(() => rec.state === "recording" && rec.stop(), 60e3);
+    setListening(true);
   };
 
   // Opened from the mic button on another screen (or the app shortcut): start listening straight away
@@ -265,17 +306,12 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
         <textarea
           rows={1}
           value={input}
-          placeholder={listening ? "Listening…" : `Message ${name}…`}
+          placeholder={listening ? "Recording… tap the red button to send" : `Message ${name}…`}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
         />
         {canListen && (
-          <>
-            <select className="lang" value={lang} onChange={(e) => { setLang(e.target.value); store.set("jarvis-lang", e.target.value); }} aria-label="Voice language">
-              {LANGS.map((l) => <option key={l.v} value={l.v}>{l.l}</option>)}
-            </select>
-            <button type="button" className={`btn ${listening ? "rec" : ""}`} aria-label={listening ? "Stop listening" : "Speak"} onClick={listen}><Icon name="mic" size={18} /></button>
-          </>
+          <button type="button" className={`btn ${listening ? "rec" : ""}`} aria-label={listening ? "Stop and send" : "Record a voice message"} onClick={listen}><Icon name={listening ? "send" : "mic"} size={18} /></button>
         )}
         <button className="btn primary" disabled={busy || (!input.trim() && !image)} aria-label="Send"><Icon name="send" size={18} /></button>
       </form>

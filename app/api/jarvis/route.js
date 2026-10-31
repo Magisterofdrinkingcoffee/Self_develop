@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { storageEnabled } from "@/lib/server";
-import { ask, authorize, clearChat, getChat, getLog, getUsage } from "@/lib/jarvis/server";
+import { AUDIO_MIME, ask, authorize, clearChat, getChat, getLog, getUsage } from "@/lib/jarvis/server";
 import { getSecret, loadData } from "@/lib/server";
 import { normalize } from "@/lib/data";
 import { tzOf } from "@/lib/jarvis/time";
@@ -10,7 +10,7 @@ export const maxDuration = 60;
 
 const plain = (s, status = 200) => new NextResponse(s, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 
-// POST { text, voice?, image?: { mime, data(base64) } }
+// POST { text, voice?, image?: { mime, data(base64) }, audio?: { mime, data(base64) } }
 // From the app (signed in): JSON { reply, actions, data? }.
 // From Siri/Shortcuts (Bearer token): plain text to speak, unless ?format=json.
 export async function POST(req) {
@@ -24,7 +24,8 @@ export async function POST(req) {
     const body = ct.includes("json") ? await req.json() : { text: await req.text() };
     const voice = body.voice ?? (who === "token" || url.searchParams.get("voice") === "1");
     const image = body.image?.data && /^image\/(png|jpe?g|webp|heic|heif)$/.test(body.image.mime || "") && body.image.data.length < 6e6 ? body.image : undefined;
-    const out = await ask({ text: body.text, source: who === "token" ? "siri" : "web", voice: !!voice, image });
+    const audio = body.audio?.data && AUDIO_MIME.test(String(body.audio.mime || "").split(";")[0]) && body.audio.data.length < 5.5e6 ? body.audio : undefined;
+    const out = await ask({ text: body.text, source: who === "token" ? "siri" : "web", voice: !!voice, image, audio });
     if (asText) return plain(out.reply);
     // The Siri token never gets the full data document back
     return NextResponse.json(who === "session" ? out : { reply: out.reply, actions: out.actions });
