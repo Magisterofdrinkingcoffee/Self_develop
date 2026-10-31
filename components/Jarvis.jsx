@@ -51,7 +51,7 @@ async function shrink(file, max = 1280) {
 
 const plainForSpeech = (t) => String(t).replace(/\*\*/g, "").replace(/^\s*[-*•]\s+/gm, "").replace(/#+\s*/g, "");
 
-export default function Jarvis({ data, update, go, storage, adopt }) {
+export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
   const [turns, setTurns] = useState([]);
   const [log, setLog] = useState([]);
   const [usage, setUsage] = useState(null);
@@ -147,6 +147,13 @@ export default function Jarvis({ data, update, go, storage, adopt }) {
     setListening(true);
     rec.start();
   };
+
+  // Opened from the mic button on another screen (or the app shortcut): start listening straight away
+  useEffect(() => {
+    if (!listenAt || !canListen || listening) return;
+    try { listen(); } catch { /* the browser wants a tap first; the mic button is right there */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listenAt]);
 
   const newChat = async () => {
     if (!confirm("Start a new conversation? Logged things stay logged.")) return;

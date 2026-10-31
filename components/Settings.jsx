@@ -271,31 +271,12 @@ $$);`;
 
   return (
     <Card title={<><Icon name="jarvis" size={18} />Jarvis</>}>
-      <p className="muted small">Your assistant works from the app, from Siri, and on its own through notifications. Short commands like "quran 10" or "asr late" are handled instantly without using any AI quota.</p>
+      <p className="muted small">Tap the round mic button on any screen to talk to Jarvis. Short commands like "quran 10" or "asr late" are handled instantly without using any AI quota.</p>
+      <label className="toggle small" style={{ marginTop: 10 }}><input type="checkbox" checked={!!j.openOnJarvis} onChange={(e) => setJ({ openOnJarvis: e.target.checked })} /> Open the app straight on Jarvis</label>
 
       <div className="setup-list">
-        <button className="setup-row" onClick={() => show("siri")} aria-expanded={open === "siri"}>
-          <strong>1. "Hey Siri, Jarvis"</strong><span className="muted small">Talk to Jarvis hands-free, about 5 minutes</span>
-        </button>
-        {open === "siri" && (
-          <div className="stack setup-body">
-            <ol className="howto">
-              <li>iPhone → <strong>Shortcuts</strong> → <strong>+</strong> → name it <strong>Jarvis</strong> (this is what you'll say to Siri).</li>
-              <li>Add <strong>Dictate Text</strong>. Set Language to the one you'll speak, and Stop Listening <strong>After Pause</strong>.</li>
-              <li>Add <strong>Get Contents of URL</strong>: the URL below, Method <strong>POST</strong>, add a header <code>Authorization</code> with value <code>Bearer</code>, a space, then the token. Request Body <strong>JSON</strong>: key <code>text</code> → Dictated Text.</li>
-              <li>Add <strong>Speak Text</strong> with <strong>Contents of URL</strong>.</li>
-              <li>Optional: put the shortcut on the <strong>Action Button</strong> (Settings → Action Button → Shortcut), or Back Tap (Accessibility → Touch → Back Tap).</li>
-              <li>To keep talking, add <strong>Run Shortcut</strong> (Jarvis) at the end. It loops until you say nothing.</li>
-            </ol>
-            <Copy label="URL" value={`${origin}/api/jarvis`} />
-            <Copy label="Token (private: anyone with it can talk to Jarvis)" value={token} />
-            <button className="link small" onClick={() => confirm("Make a new token? Siri shortcuts, the health automation and the tick need the new one.") && get(true)}>Make a new token</button>
-            <p className="muted small">The older "Log it" shortcut (<code>/api/quick</code>) keeps working with the same token.</p>
-          </div>
-        )}
-
         <button className="setup-row" onClick={() => show("tick")} aria-expanded={open === "tick"}>
-          <strong>2. Proactive notifications</strong>
+          <strong>1. Proactive notifications</strong>
           <span className={`small ${lastTick != null && lastTick < 15 ? "pos" : "muted"}`}>{lastTick == null ? "Not set up yet" : lastTick < 15 ? `Running · last check ${lastTick} min ago` : `Last check ${lastTick} min ago (stopped?)`}</span>
         </button>
         {open === "tick" && (
@@ -311,7 +292,7 @@ $$);`;
         )}
 
         <button className="setup-row" onClick={() => show("health")} aria-expanded={open === "health"}>
-          <strong>3. Apple Health</strong><span className="muted small">Steps, sleep, heart rate and weight every night</span>
+          <strong>2. Apple Health</strong><span className="muted small">Steps, sleep, heart rate and weight every night</span>
         </button>
         {open === "health" && (
           <div className="stack setup-body">
@@ -323,7 +304,8 @@ $$);`;
               <li>Add <strong>Get Contents of URL</strong>: URL below, POST, header <code>Authorization</code> = <code>Bearer</code> + token, JSON body with keys <code>steps</code>, <code>sleepH</code>, <code>restingHr</code>, <code>weightKg</code> set to those results.</li>
             </ol>
             <Copy label="URL" value={`${origin}/api/jarvis/health`} />
-            <Copy label="Token" value={token} />
+            <Copy label="Token (private)" value={token} />
+            <button className="link small" onClick={() => confirm("Make a new token? The health automation and the 5-minute tick need the new one.") && get(true)}>Make a new token</button>
           </div>
         )}
       </div>

@@ -68,10 +68,10 @@ The app picks the newest Flash model automatically; set `GEMINI_MODEL` to force 
 
 ## Jarvis
 
-Jarvis is one brain (`/api/jarvis`) with several ways in: the **Jarvis** tab (typing, voice, photos), **Siri**, and **notifications** it sends by itself.
+Jarvis is one brain (`/api/jarvis`) with several ways in: the **Jarvis** tab (typing, voice, photos), the round **mic button** on every screen, and **notifications** it sends by itself.
 
 ```
- Siri voice ─┐
+ Mic button ─┐
  Web chat  ──┼──►  /api/jarvis  ──► 1. fast path: "quran 10", "asr late", "spent 12 food"… (no AI call)
  5-min tick ─┘                      2. agent loop: Gemini + tools, up to 6 steps
                                     3. memory: facts/goals + nightly summaries, in every prompt
@@ -84,7 +84,7 @@ Jarvis is one brain (`/api/jarvis`) with several ways in: the **Jarvis** tab (ty
 
 ### Set up (Settings → Jarvis)
 1. **Gemini key** (Settings → AI or `GEMINI_API_KEY`). The free tier is enough for one person: fast-path commands use no quota, a normal message uses 2–3 calls. The Jarvis tab shows today's count.
-2. **"Hey Siri, Jarvis"**: a 4-step Shortcut (Dictate → POST to `/api/jarvis` with your token → Speak). Replies are short and written to be spoken. Put it on the Action Button for one-press access.
+2. **Talk**: tap the mic button on any screen (it opens Jarvis and starts listening), or turn on "Open the app straight on Jarvis". On Android/desktop, long-press the app icon → *Talk to Jarvis*.
 3. **Proactive notifications**: turn on Notifications, then run the SQL shown in Settings → Jarvis (or `supabase/jarvis.sql`) in Supabase. It uses Supabase's free `pg_cron` to call `/api/jarvis/tick` every 5 minutes, and the code decides what's due:
    - morning briefing ~20 min after Subuh (AI-written; also saved in the chat)
    - reminder before each prayer, and "Did you pray …?" with **On time / Late** buttons if it isn't logged
@@ -118,9 +118,6 @@ Add your own phrases (in your three languages) to `evals/cases.json` and run the
 
 ## Notifications
 Settings → Notifications → **Turn on for this device** (on iPhone: open the app from the Home Screen first; needs iOS 16.4+). With the Jarvis tick set up, Jarvis sends the briefing and review itself. As a fallback, Vercel Cron (`vercel.json`) sends a morning plan around 07:30 and an evening check-in around 21:30 Malaysia time, skipped when Jarvis already sent one (Vercel's free plan may run a cron any time within that hour). Each is sent at most once a day. Optional: set `CRON_SECRET` in Vercel to lock the cron URL.
-
-## Siri quick add
-The older "Log it" shortcut still works (Settings → Jarvis shows the token; URL `/api/quick`), but the Jarvis shortcut does everything it did and more. Phrases: `Quran 10`, `book 20`, `spent 12.50 food lunch`, `ate nasi lemak` (Gemini estimates calories), `todo call landlord`, `weight 82.5`. Changes made while the app is open elsewhere are picked up within a minute; a device that tries to save over newer data gets the newer data instead.
 
 ## More
 - **Prayer times** (Settings): calculated on the device, JAKIM-style by default for Kota Warisan; shown in today's agenda and the evening check-in. Expect ±2 minutes vs the official JAKIM table.
