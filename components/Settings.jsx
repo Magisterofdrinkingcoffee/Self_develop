@@ -275,6 +275,23 @@ $$);`;
       <label className="toggle small" style={{ marginTop: 10 }}><input type="checkbox" checked={!!j.openOnJarvis} onChange={(e) => setJ({ openOnJarvis: e.target.checked })} /> Open the app straight on Jarvis</label>
 
       <div className="setup-list">
+        <button className="setup-row" onClick={() => show("siri")} aria-expanded={open === "siri"}>
+          <strong>Siri: "Hey Siri, Jarvis"</strong><span className="muted small">3 steps, about 1 minute</span>
+        </button>
+        {open === "siri" && (
+          <div className="stack setup-body">
+            <Copy label="Your Siri link (private, it works like a password)" value={token ? `${origin}/api/jarvis/siri?token=${token}&q=` : "Loading…"} />
+            <ol className="howto">
+              <li>Shortcuts app → <strong>+</strong> → rename it <strong>Jarvis</strong>.</li>
+              <li>Add <strong>Dictate Text</strong>.</li>
+              <li>Add <strong>Get Contents of URL</strong>. Paste the link, then at the very end tap and insert <strong>Dictated Text</strong>. Nothing else to change.</li>
+              <li>Add <strong>Speak Text</strong>.</li>
+            </ol>
+            <p className="small">Now say <strong>"Hey Siri, Jarvis"</strong>, then talk. Tip: put it on the Action Button or Back Tap for one press.</p>
+            <button className="link small" onClick={() => confirm("Make a new link? The old Siri shortcut, health automation and tick stop working until you update them.") && get(true)}>Make a new link</button>
+          </div>
+        )}
+
         <button className="setup-row" onClick={() => show("tick")} aria-expanded={open === "tick"}>
           <strong>1. Proactive notifications</strong>
           <span className={`small ${lastTick != null && lastTick < 15 ? "pos" : "muted"}`}>{lastTick == null ? "Not set up yet" : lastTick < 15 ? `Running · last check ${lastTick} min ago` : `Last check ${lastTick} min ago (stopped?)`}</span>
