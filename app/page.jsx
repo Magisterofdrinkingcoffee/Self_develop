@@ -11,13 +11,15 @@ import Sport from "@/components/Sport";
 import Food from "@/components/Food";
 import Finance from "@/components/Finance";
 import Settings from "@/components/Settings";
-import Coach from "@/components/Coach";
+import Jarvis from "@/components/Jarvis";
+import Islam from "@/components/Islam";
 import Icon from "@/components/Icon";
 
 const TABS = [
   { id: "today", label: "Today", group: "Day", C: Today },
   { id: "planner", label: "Planner", group: "Day", C: Planner },
-  { id: "coach", label: "Coach", group: "Day", C: Coach },
+  { id: "jarvis", label: "Jarvis", group: "Day", C: Jarvis },
+  { id: "islam", label: "Islam", group: "Day", C: Islam },
   { id: "studies", label: "Studies", group: "Work", C: Studies },
   { id: "projects", label: "Projects", group: "Work", C: Projects },
   { id: "reading", label: "Reading", group: "Work", C: Reading },
@@ -26,7 +28,7 @@ const TABS = [
   { id: "finance", label: "Finance", group: "Body & money", C: Finance },
   { id: "settings", label: "Settings", group: null, C: Settings },
 ];
-const BAR = ["today", "planner", "food", "coach"]; // iPhone tab bar; the rest live under "More"
+const BAR = ["today", "jarvis", "islam", "planner"]; // iPhone tab bar; the rest live under "More"
 const LOCAL_KEY = "life-tracker-data";
 
 export default function App() {
@@ -72,6 +74,7 @@ export default function App() {
     const q = new URLSearchParams(location.search);
     let t = q.get("tab");
     try { if (!t) t = localStorage.getItem("life-tracker-tab"); } catch {}
+    if (t === "coach") t = "jarvis";
     if (t && TABS.some((x) => x.id === t)) setTab(t);
     if (q.get("connected")) setNotice({ kind: "good", text: `${q.get("connected") === "google" ? "Google" : "Outlook"} is connected.` });
     if (q.get("connect_error")) setNotice({ kind: "bad", text: q.get("connect_error") });
@@ -154,6 +157,14 @@ export default function App() {
     []
   );
 
+  // Take a newer copy of the data saved on the server (by Jarvis, an undo, a notification button)
+  const adopt = useCallback((d) => {
+    if (!d) return;
+    version.current = d.updatedAt ?? null;
+    first.current = true;
+    setData(normalize(d));
+  }, []);
+
   const go = (id) => {
     setTab(id);
     setMore(false);
@@ -206,7 +217,7 @@ export default function App() {
             Storage isn't connected yet, so data is only kept in this browser. Connect Supabase to sync across devices (see README).
           </div>
         )}
-        <Current data={data} update={update} go={go} storage={storage} />
+        <Current data={data} update={update} go={go} storage={storage} adopt={adopt} />
       </main>
 
       <nav className="tabbar" aria-label="Sections">

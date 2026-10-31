@@ -1,6 +1,6 @@
 // Life Tracker service worker: makes the app open instantly and work offline for what's been loaded.
 // API calls always go to the network (your data must stay fresh); the app shell is cached.
-const VERSION = "lt-v2";
+const VERSION = "lt-v3";
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {
@@ -55,12 +55,23 @@ self.addEventListener("push", (e) => {
       badge: "/icons/icon-192.png",
       tag: p.tag || "life",
       data: { url: p.url || "/" },
+      actions: Array.isArray(p.actions) ? p.actions.slice(0, 2) : [],
     })
   );
 });
 
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
+  // Buttons like "On time" / "Late" log straight away without opening the app
+  if (e.action) {
+    e.waitUntil(
+      fetch("/api/jarvis/act", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: e.action }) })
+        .then((r) => r.json())
+        .then((j) => self.registration.showNotification(j.ok ? "Logged" : "Couldn't log", { body: j.ok ? (j.actions || []).join(", ") : j.error || "Open the app to log it.", icon: "/icons/icon-192.png", tag: "logged" }))
+        .catch(() => {})
+    );
+    return;
+  }
   const url = (e.notification.data && e.notification.data.url) || "/";
   e.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {

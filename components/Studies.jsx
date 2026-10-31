@@ -5,6 +5,7 @@ import { Card, Del, Empty, Header, NoteArea } from "./ui";
 import { dateKey, fmtDate, parseKey, uid } from "@/lib/data";
 import Icon from "./Icon";
 import FocusTimer from "./FocusTimer";
+import Flashcards from "./Flashcards";
 import { localDay } from "@/lib/useRemote";
 
 export default function Studies({ data, update }) {
@@ -75,6 +76,7 @@ export default function Studies({ data, update }) {
       <Header title="Studies" sub="Focus sessions, deadlines, subjects and notes" />
 
       <FocusTimer data={data} update={update} />
+      <Flashcards data={data} update={update} />
 
       <Card
         title="Deadlines"

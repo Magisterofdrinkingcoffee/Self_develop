@@ -48,6 +48,33 @@ function WeightChart({ weights }) {
   );
 }
 
+// Steps, sleep and resting heart rate from Apple Health (sent by an iPhone Shortcut, see Settings → Jarvis)
+function Health({ data }) {
+  const today = dateKey();
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
+  const rows = days.map((d) => ({ d, ...(data.health?.[d] || {}) }));
+  if (!rows.some((r) => r.steps || r.sleepH)) return null;
+  const avg = (k) => { const v = rows.map((r) => Number(r[k])).filter((x) => x > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const maxSteps = Math.max(...rows.map((r) => Number(r.steps) || 0), 1);
+  return (
+    <Card title="Health, last 7 days" right={<span className="muted small">from Apple Health</span>}>
+      <div className="stats" style={{ marginBottom: 10 }}>
+        <div className="stat"><span className="muted small">Steps / day</span><strong>{avg("steps") ? Math.round(avg("steps")).toLocaleString("en-US") : "—"}</strong></div>
+        <div className="stat"><span className="muted small">Sleep / night</span><strong>{avg("sleepH") ? `${avg("sleepH").toFixed(1)} h` : "—"}</strong></div>
+        <div className="stat"><span className="muted small">Resting HR</span><strong>{avg("restingHr") ? `${Math.round(avg("restingHr"))} bpm` : "—"}</strong></div>
+      </div>
+      <div className="minibars" role="img" aria-label="Steps per day">
+        {rows.map((r) => (
+          <div key={r.d} title={`${fmtDate(r.d)}: ${r.steps || 0} steps${r.sleepH ? `, ${r.sleepH} h sleep` : ""}`}>
+            <span style={{ height: `${Math.max(3, ((Number(r.steps) || 0) / maxSteps) * 100)}%` }} />
+            <small>{fmtDate(r.d, { weekday: "narrow" })}</small>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 const TYPES = ["Gym – upper body", "Gym – lower body", "Gym – full body", "Basketball", "Swimming", "Running", "Cycling", "Other"];
 
 export default function Sport({ data, update }) {
@@ -93,6 +120,8 @@ export default function Sport({ data, update }) {
         <div className="stat"><span className="muted small">Average vs last week</span><strong className={weekly < 0 ? "pos" : weekly > 0 ? "neg" : ""}>{weekly != null ? `${weekly > 0 ? "+" : ""}${weekly} kg` : "—"}</strong></div>
         <div className="stat"><span className="muted small">Since first log</span><strong>{change ? `${change > 0 ? "+" : ""}${change} kg` : "—"}</strong></div>
       </div>
+
+      <Health data={data} />
 
       <Card title="Weight trend">
         <WeightChart weights={weights} />

@@ -1,6 +1,6 @@
 # Life Tracker
 
-One place for the whole day: minimums, to-dos, daily and weekly summaries, timetable, studies, projects, reading notes, sport, food and finance. It installs as an app on iPhone and desktop, pulls in Google Calendar, Gmail, Outlook and Moodle, and uses Gemini for calorie estimates and a personal coach.
+One place for the whole day: minimums, to-dos, daily and weekly summaries, timetable, studies, projects, reading notes, sport, food, finance and Islamic practice. It installs as an app on iPhone and desktop, pulls in Google Calendar, Gmail, Outlook and Moodle, and has **Jarvis**: a personal assistant (Gemini) that logs, plans, quizzes, remembers and reaches out on its own.
 
 Everything is editable on the site, including the minimums and their targets (Settings).
 
@@ -63,14 +63,64 @@ University accounts sometimes require admin approval for third-party apps. If Mi
 ## AI (Gemini)
 Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Either add it in Vercel as `GEMINI_API_KEY` (recommended) or paste it in **Settings → AI**. It's only used on the server.
 - **Food → Estimate with AI**: describe a meal or take a photo → items with kcal, protein, carbs and fat → "Add to log".
-- **Coach**: asks Gemini about your own numbers (minimums, meals, workouts, spending, deadlines, calendar).
+- **Jarvis**: see below.
 The app picks the newest Flash model automatically; set `GEMINI_MODEL` to force one. On the free tier Google may use prompts to improve its products, so don't log anything you wouldn't want seen.
 
+## Jarvis
+
+Jarvis is one brain (`/api/jarvis`) with several ways in: the **Jarvis** tab (typing, voice, photos), **Siri**, and **notifications** it sends by itself.
+
+```
+ Siri voice ─┐
+ Web chat  ──┼──►  /api/jarvis  ──► 1. fast path: "quran 10", "asr late", "spent 12 food"… (no AI call)
+ 5-min tick ─┘                      2. agent loop: Gemini + tools, up to 6 steps
+                                    3. memory: facts/goals + nightly summaries, in every prompt
+                                    4. action log: every change has an exact undo
+```
+
+**What it can do** (tools in `lib/jarvis/tools.js`): read your day (classes, calendar, prayer times, free windows), add/complete to-dos, deadlines and timed reminders, log minimums, meals (it estimates kcal), workouts with sets × reps × kg, weight, money, study time, prayers (on time / late / qada / missed), fasts, the Quran khatm plan and hifz reviews, search your own lecture PDFs, make and quiz flashcards, look up real Quran verses (api.alquran.cloud), give stats and progressive-overload advice, remember/forget things, and undo.
+
+**Rules it follows**: acts instead of just talking; uses your numbers; plans around prayers and classes; quotes the Quran only from the API with references; never invents hadith or gives fatwas; replies in English, Russian or Kazakh; asks before anything irreversible.
+
+### Set up (Settings → Jarvis)
+1. **Gemini key** (Settings → AI or `GEMINI_API_KEY`). The free tier is enough for one person: fast-path commands use no quota, a normal message uses 2–3 calls. The Jarvis tab shows today's count.
+2. **"Hey Siri, Jarvis"**: a 4-step Shortcut (Dictate → POST to `/api/jarvis` with your token → Speak). Replies are short and written to be spoken. Put it on the Action Button for one-press access.
+3. **Proactive notifications**: turn on Notifications, then run the SQL shown in Settings → Jarvis (or `supabase/jarvis.sql`) in Supabase. It uses Supabase's free `pg_cron` to call `/api/jarvis/tick` every 5 minutes, and the code decides what's due:
+   - morning briefing ~20 min after Subuh (AI-written; also saved in the chat)
+   - reminder before each prayer, and "Did you pray …?" with **On time / Late** buttons if it isn't logged
+   - evening adhkar after Asar, sunnah fasting reminder the evening before (Mon/Thu, white days, Arafah, Ashura, Ramadan)
+   - deadline watchdog (18:00), weekly minimums check (Fri/Sat 20:00)
+   - evening review after Isyak; reminders you asked for at their time
+   - nightly: the day's chat is condensed into memory
+   Nudges never come during classes or quiet hours and are capped per day; prayer reminders and your own reminders always come.
+4. **Apple Health** (optional): a nightly Shortcuts automation POSTs steps, sleep, resting heart rate and weight to `/api/jarvis/health`. Shown on Sport and used by Jarvis.
+5. **Notes**: in Reading, open a PDF and press **Let Jarvis read it**. Text is extracted in the browser, split into chunks and embedded (Gemini embeddings, 256-d, stored as int8). Search is hybrid (meaning + keywords) and still works by keywords without a key.
+
+### Islam tab
+Prayer log per day with streak, on-time %, qada counter; Quran khatm plan (page, finish date → pages per day; pages also count toward the Quran minimum); hifz with spaced review; fasting days ahead and the Hijri date (Umm al-Qura; can differ by a day from local sighting).
+
+### Studies → Flashcards
+Spaced repetition (SM-2 style). Make cards by hand or ask Jarvis: "make 10 flashcards from my AIT201 notes on overfitting", then "quiz me".
+
+### Tests and evals
+```bash
+npm test                      # unit tests for tools, undo, agent loop, scheduler, Islamic helpers, notes search
+GEMINI_API_KEY=... npm run eval   # does Gemini pick the right tools for real phrases? (evals/cases.json)
+```
+Add your own phrases (in your three languages) to `evals/cases.json` and run the eval after changing tools or the prompt.
+
+### Where things live
+| | |
+|---|---|
+| Main data (tracker, prayers, quran, cards, memories, reminders) | `life_data` row `main` (synced to the app, included in backups) |
+| Chat history, action log (undo), AI usage, tick state | `life_data` rows `secret:jarvis-chat`, `secret:jarvis-log`, `secret:jarvis-usage`, `secret:tick-state` |
+| Indexed notes | `life_data` rows `notes:<book id>` |
+
 ## Notifications
-Settings → Notifications → **Turn on for this device** (on iPhone: open the app from the Home Screen first; needs iOS 16.4+). Vercel Cron (`vercel.json`) sends a morning plan around 07:30 and an evening check-in around 21:30 Malaysia time (Vercel's free plan may run a cron any time within that hour). Each is sent at most once a day. Optional: set `CRON_SECRET` in Vercel to lock the cron URL.
+Settings → Notifications → **Turn on for this device** (on iPhone: open the app from the Home Screen first; needs iOS 16.4+). With the Jarvis tick set up, Jarvis sends the briefing and review itself. As a fallback, Vercel Cron (`vercel.json`) sends a morning plan around 07:30 and an evening check-in around 21:30 Malaysia time, skipped when Jarvis already sent one (Vercel's free plan may run a cron any time within that hour). Each is sent at most once a day. Optional: set `CRON_SECRET` in Vercel to lock the cron URL.
 
 ## Siri quick add
-Settings → Siri and quick add → **Show setup** gives the URL, a private token and the 4-step iOS Shortcut. Phrases: `Quran 10`, `book 20`, `spent 12.50 food lunch`, `ate nasi lemak` (Gemini estimates calories), `todo call landlord`, `weight 82.5`. Changes made while the app is open elsewhere are picked up within a minute; a device that tries to save over newer data gets the newer data instead.
+The older "Log it" shortcut still works (Settings → Jarvis shows the token; URL `/api/quick`), but the Jarvis shortcut does everything it did and more. Phrases: `Quran 10`, `book 20`, `spent 12.50 food lunch`, `ate nasi lemak` (Gemini estimates calories), `todo call landlord`, `weight 82.5`. Changes made while the app is open elsewhere are picked up within a minute; a device that tries to save over newer data gets the newer data instead.
 
 ## More
 - **Prayer times** (Settings): calculated on the device, JAKIM-style by default for Kota Warisan; shown in today's agenda and the evening check-in. Expect ±2 minutes vs the official JAKIM table.
@@ -85,10 +135,10 @@ Settings → Siri and quick add → **Show setup** gives the URL, a private toke
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Data sync, login (added by the Supabase integration) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (or paste in Settings) | Google Calendar + Gmail |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, optional `MS_TENANT` (or paste in Settings) | Outlook |
-| `GEMINI_API_KEY` (or paste in Settings), optional `GEMINI_MODEL` | Calorie estimates, Coach, weekly review, Siri meal estimates |
+| `GEMINI_API_KEY` (or paste in Settings), optional `GEMINI_MODEL`, `GEMINI_EMBED_MODEL` | Jarvis, calorie estimates, weekly review, notes search |
 | `SESSION_SECRET` (optional) | Signs login cookies (defaults to the Supabase key) |
 | `LOGIN_USER`, `LOGIN_PASSWORD_HASH` (optional) | Change the username/password |
-| `CRON_SECRET` (optional) | Locks the daily notification cron URL |
+| `CRON_SECRET` (optional) | Locks the daily notification cron URL (the Jarvis tick also accepts it) |
 
 ## Run locally
 ```bash
@@ -103,7 +153,8 @@ Open http://localhost:3000. Without the env variables, data is kept in the brows
 - **Reading** – upload a PDF and read it on the site; it remembers your page. Each book has "where I stopped", notes with page numbers, and a summary. Updating the page automatically adds the pages read to your Book minimum for today (change or turn off in Settings).
 - **Studies** – subjects with notes, deadlines with countdowns.
 - **Projects** – status + the next concrete step for each.
-- **Coach** – ask Gemini for a day plan, catch-up plan for minimums, meal ideas, weekly review, spending check.
+- **Jarvis** – talk or type; it logs, plans your day, quizzes you, answers from your notes and remembers you.
+- **Islam** – prayers, qada, Quran khatm, hifz review, fasting days.
 - **Sport / Food / Finance** – quick logging with weekly/monthly totals; Food can estimate calories and macros from text or a photo.
 - **Settings** – edit minimums (name, target, unit, order), calorie target, workout goal, currency, expense categories, backup/restore.
 

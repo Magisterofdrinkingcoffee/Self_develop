@@ -134,8 +134,8 @@ function Connections({ storage }) {
             <strong>Gemini API key</strong>
             <div className="muted small">
               {st?.gemini?.connected
-                ? st.gemini.fromEnv ? "Set in Vercel (GEMINI_API_KEY)." : "Saved. Used for calorie estimates and the Coach."
-                : "Powers calorie estimates from text or photos, and the Coach. The key stays on the server."}
+                ? st.gemini.fromEnv ? "Set in Vercel (GEMINI_API_KEY)." : "Saved. Powers Jarvis and calorie estimates."
+                : "Powers Jarvis, calorie estimates and notes search. Free at aistudio.google.com. The key stays on the server."}
             </div>
           </div>
           {st?.gemini?.connected && !st.gemini.fromEnv && <button className="btn danger" onClick={() => post({ action: "removeGeminiKey" }, "k")}>Remove</button>}
@@ -206,7 +206,7 @@ function Notifications({ storage }) {
 
   return (
     <Card title="Notifications">
-      <p className="muted small">A morning plan around 7:30 (classes, what's due, minimums left) and an evening check-in around 21:30 if something isn't logged yet.</p>
+      <p className="muted small">Turn on for each device where you want Jarvis to reach you: the morning briefing, prayer reminders, reminders you ask for and the evening review. What gets sent is set in the Jarvis card below.</p>
       {!storage ? <p className="muted small">Connect Supabase first.</p> : !supported ? (
         <p className="small" style={{ marginTop: 10 }}>{ios && !standalone ? "On iPhone, add the app to your Home Screen first, open it from there, then turn notifications on here." : "This browser doesn't support notifications."}</p>
       ) : (
@@ -221,35 +221,130 @@ function Notifications({ storage }) {
   );
 }
 
-function QuickAdd({ storage, data }) {
+function Copy({ label, value, area }) {
+  return (
+    <label className="field">
+      <span className="muted small">{label}</span>
+      <span className="row">
+        {area ? <textarea readOnly rows={8} value={value} onFocus={(e) => e.target.select()} className="mono" /> : <input readOnly value={value} onFocus={(e) => e.target.select()} />}
+        <button type="button" className="btn" onClick={() => navigator.clipboard?.writeText(value)}>Copy</button>
+      </span>
+    </label>
+  );
+}
+
+function JarvisSetup({ storage, data, update }) {
   const [token, setToken] = useState("");
-  const [show, setShow] = useState(false);
+  const [open, setOpen] = useState("");
   const [origin, setOrigin] = useState("");
+  const [tick, setTick] = useState(null);
   useEffect(() => { setOrigin(location.origin); }, []);
   const get = async (regen) => {
     const r = await fetch("/api/quick", { method: regen ? "PUT" : "GET", cache: "no-store" }).catch(() => null);
     const j = await r?.json().catch(() => ({}));
-    if (j?.token) { setToken(j.token); setShow(true); }
+    if (j?.token) setToken(j.token);
   };
-  const ex = data.minimums[1]?.name || data.minimums[0]?.name || "Quran";
+  useEffect(() => {
+    if (!storage) return;
+    fetch("/api/jarvis", { cache: "no-store" }).then((r) => r.json()).then((j) => setTick(j.tick || false)).catch(() => {});
+  }, [storage]);
+  const show = (k) => { setOpen(open === k ? "" : k); if (!token) get(false); };
+  const j = data.settings.jarvis || {};
+  const setJ = (patch) => update((d) => { d.settings.jarvis = { ...d.settings.jarvis, ...patch }; });
+  const sql = `create extension if not exists pg_cron;
+create extension if not exists pg_net;
+select cron.unschedule('jarvis-tick') where exists (select 1 from cron.job where jobname = 'jarvis-tick');
+select cron.schedule('jarvis-tick', '*/5 * * * *', $$
+  select net.http_post(
+    url := '${origin}/api/jarvis/tick',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ${token || "YOUR-TOKEN"}'),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 55000
+  );
+$$);`;
+  const lastTick = tick?.lastRun ? Math.round((Date.now() - new Date(tick.lastRun)) / 60e3) : null;
+  const Toggle = ({ k, children }) => (
+    <label className="toggle small"><input type="checkbox" checked={j[k] !== false} onChange={(e) => setJ({ [k]: e.target.checked })} /> {children}</label>
+  );
+
+  if (!storage) return <Card title={<><Icon name="jarvis" size={18} />Jarvis</>}><p className="muted small">Connect Supabase first.</p></Card>;
+
   return (
-    <Card title="Siri and quick add">
-      <p className="muted small">Log without opening the app: say "Hey Siri, Log it" then "{ex} 10", "spent 12 food lunch", "ate nasi lemak", "todo call landlord" or "weight 82.5".</p>
-      {!storage ? <p className="muted small">Connect Supabase first.</p> : !show ? (
-        <button className="btn" style={{ marginTop: 12 }} onClick={() => get(false)}>Show setup</button>
-      ) : (
-        <div className="stack" style={{ marginTop: 12 }}>
-          <ol className="howto">
-            <li>iPhone → Shortcuts app → + → name it "Log it".</li>
-            <li>Add <strong>Dictate Text</strong>.</li>
-            <li>Add <strong>Get Contents of URL</strong>: URL below, Method <strong>POST</strong>, Headers: <code>Authorization</code> = <code>Bearer</code> + space + the token, Request Body <strong>JSON</strong> with key <code>text</code> = Dictated Text.</li>
-            <li>Add <strong>Speak Text</strong> (Contents of URL), so Siri reads back what was saved.</li>
-          </ol>
-          <label className="field"><span className="muted small">URL</span><span className="row"><input readOnly value={`${origin}/api/quick`} onFocus={(e) => e.target.select()} /><button className="btn" onClick={() => navigator.clipboard?.writeText(`${origin}/api/quick`)}>Copy</button></span></label>
-          <label className="field"><span className="muted small">Token (keep private, it can add entries)</span><span className="row"><input readOnly value={token} onFocus={(e) => e.target.select()} /><button className="btn" onClick={() => navigator.clipboard?.writeText(token)}>Copy</button></span></label>
-          <button className="link small" onClick={() => confirm("Make a new token? The old one stops working.") && get(true)}>Make a new token</button>
-        </div>
-      )}
+    <Card title={<><Icon name="jarvis" size={18} />Jarvis</>}>
+      <p className="muted small">Your assistant works from the app, from Siri, and on its own through notifications. Short commands like "quran 10" or "asr late" are handled instantly without using any AI quota.</p>
+
+      <div className="setup-list">
+        <button className="setup-row" onClick={() => show("siri")} aria-expanded={open === "siri"}>
+          <strong>1. "Hey Siri, Jarvis"</strong><span className="muted small">Talk to Jarvis hands-free, about 5 minutes</span>
+        </button>
+        {open === "siri" && (
+          <div className="stack setup-body">
+            <ol className="howto">
+              <li>iPhone → <strong>Shortcuts</strong> → <strong>+</strong> → name it <strong>Jarvis</strong> (this is what you'll say to Siri).</li>
+              <li>Add <strong>Dictate Text</strong>. Set Language to the one you'll speak, and Stop Listening <strong>After Pause</strong>.</li>
+              <li>Add <strong>Get Contents of URL</strong>: the URL below, Method <strong>POST</strong>, add a header <code>Authorization</code> with value <code>Bearer</code>, a space, then the token. Request Body <strong>JSON</strong>: key <code>text</code> → Dictated Text.</li>
+              <li>Add <strong>Speak Text</strong> with <strong>Contents of URL</strong>.</li>
+              <li>Optional: put the shortcut on the <strong>Action Button</strong> (Settings → Action Button → Shortcut), or Back Tap (Accessibility → Touch → Back Tap).</li>
+              <li>To keep talking, add <strong>Run Shortcut</strong> (Jarvis) at the end. It loops until you say nothing.</li>
+            </ol>
+            <Copy label="URL" value={`${origin}/api/jarvis`} />
+            <Copy label="Token (private: anyone with it can talk to Jarvis)" value={token} />
+            <button className="link small" onClick={() => confirm("Make a new token? Siri shortcuts, the health automation and the tick need the new one.") && get(true)}>Make a new token</button>
+            <p className="muted small">The older "Log it" shortcut (<code>/api/quick</code>) keeps working with the same token.</p>
+          </div>
+        )}
+
+        <button className="setup-row" onClick={() => show("tick")} aria-expanded={open === "tick"}>
+          <strong>2. Proactive notifications</strong>
+          <span className={`small ${lastTick != null && lastTick < 15 ? "pos" : "muted"}`}>{lastTick == null ? "Not set up yet" : lastTick < 15 ? `Running · last check ${lastTick} min ago` : `Last check ${lastTick} min ago (stopped?)`}</span>
+        </button>
+        {open === "tick" && (
+          <div className="stack setup-body">
+            <p className="small">Supabase calls Jarvis every 5 minutes (free) and Jarvis decides if anything is due. Turn on Notifications above first, on each device.</p>
+            <ol className="howto">
+              <li>Supabase → your project → <strong>SQL Editor</strong> → New query.</li>
+              <li>Paste this and press <strong>Run</strong>. It's already filled in with your site and token.</li>
+            </ol>
+            <Copy label="SQL" value={sql} area />
+            <p className="muted small">Check: run <code>select * from cron.job_run_details order by start_time desc limit 5;</code>. This card shows "Running" once the first check arrives.</p>
+          </div>
+        )}
+
+        <button className="setup-row" onClick={() => show("health")} aria-expanded={open === "health"}>
+          <strong>3. Apple Health</strong><span className="muted small">Steps, sleep, heart rate and weight every night</span>
+        </button>
+        {open === "health" && (
+          <div className="stack setup-body">
+            <ol className="howto">
+              <li>Shortcuts → <strong>Automation</strong> → <strong>+</strong> → <strong>Time of Day</strong> 23:00, Daily, <strong>Run Immediately</strong>.</li>
+              <li>Add <strong>Find Health Samples</strong>: Type Steps, Start Date is today, Group by Day. Then <strong>Calculate Statistics</strong> → Sum.</li>
+              <li>Add <strong>Find Health Samples</strong>: Sleep Analysis, Start Date in the last 1 day. Then <strong>Calculate Statistics</strong> → Sum of Duration (in hours).</li>
+              <li>Optional: Resting Heart Rate (latest) and Weight (latest, kg).</li>
+              <li>Add <strong>Get Contents of URL</strong>: URL below, POST, header <code>Authorization</code> = <code>Bearer</code> + token, JSON body with keys <code>steps</code>, <code>sleepH</code>, <code>restingHr</code>, <code>weightKg</code> set to those results.</li>
+            </ol>
+            <Copy label="URL" value={`${origin}/api/jarvis/health`} />
+            <Copy label="Token" value={token} />
+          </div>
+        )}
+      </div>
+
+      <h4 className="subhead">What Jarvis tells you on its own</h4>
+      <div className="toggles">
+        <Toggle k="briefing">Morning briefing, {j.briefingDelay ?? 20} min after Subuh</Toggle>
+        <Toggle k="prayerReminders">Reminder {j.prayerReminderMin ?? 10} min before each prayer</Toggle>
+        <Toggle k="prayerCheck">"Did you pray…?" if a prayer isn't logged</Toggle>
+        <Toggle k="adhkar">Evening adhkar after Asar</Toggle>
+        <Toggle k="deadlines">Deadline watchdog (18:00)</Toggle>
+        <Toggle k="fasting">Sunnah fasting the evening before</Toggle>
+        <Toggle k="evening">Evening review after Isyak</Toggle>
+      </div>
+      <div className="formgrid tight" style={{ marginTop: 10 }}>
+        <label className="field"><span className="muted small">Quiet from (until Subuh)</span><input type="time" value={j.quietFrom || "23:00"} onChange={(e) => setJ({ quietFrom: e.target.value })} /></label>
+        <label className="field"><span className="muted small">Max nudges a day</span><input type="number" min="0" max="30" value={j.maxNudges ?? 8} onChange={(e) => setJ({ maxNudges: Number(e.target.value) || 0 })} /></label>
+        <label className="field"><span className="muted small">Minutes before prayer</span><input type="number" min="0" max="60" value={j.prayerReminderMin ?? 10} onChange={(e) => setJ({ prayerReminderMin: Number(e.target.value) || 0 })} /></label>
+        <label className="field"><span className="muted small">Assistant's name</span><input value={j.voiceName || "Jarvis"} onChange={(e) => setJ({ voiceName: e.target.value })} /></label>
+      </div>
+      <p className="muted small">Nudges never come during your classes or quiet hours. Prayer reminders and your own reminders always do.</p>
     </Card>
   );
 }
@@ -401,10 +496,8 @@ export default function Settings({ data, update, storage }) {
         </Card>
       </div>
 
-      <div className="grid2">
-        <Notifications storage={storage} />
-        <QuickAdd storage={storage} data={data} />
-      </div>
+      <Notifications storage={storage} />
+      <JarvisSetup storage={storage} data={data} update={update} />
 
       <Card title="Install as an app">
         <ul className="howto" style={{ paddingLeft: 18 }}>
