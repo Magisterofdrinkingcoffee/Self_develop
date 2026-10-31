@@ -84,7 +84,7 @@ Jarvis is one brain (`/api/jarvis`) with several ways in: the **Jarvis** tab (ty
 
 ### Set up (Settings → Jarvis)
 1. **Gemini key** (Settings → AI or `GEMINI_API_KEY`). The free tier is enough for one person: fast-path commands use no quota, a normal message uses 2–3 calls. The Jarvis tab shows today's count.
-2. **Siri**: Settings → Jarvis → *Siri* gives you a private link. Shortcut: *Record Audio* → *Get Contents of URL* (POST, body File = Recorded Audio) → *Speak Text*. The recording is understood by Gemini, so iPhone dictation isn't needed. Typed text also works: `GET /api/jarvis/siri?token=…&q=…`.
+2. **Siri**: a one-action Shortcut, *Open URLs* → `https://<your-site>/?listen=1`. Siri opens Jarvis already listening; it sends when you stop talking and reads the answer aloud. Your voice is recorded by the page and understood by Gemini, so iPhone dictation isn't needed (sign in once in Safari first). Text-only shortcuts can still call `GET /api/jarvis/siri?token=…&q=…`.
 3. **Talk in the app**: tap the mic button on any screen (it opens Jarvis and starts listening), or turn on "Open the app straight on Jarvis". On Android/desktop, long-press the app icon → *Talk to Jarvis*.
 3. **Proactive notifications**: turn on Notifications, then run the SQL shown in Settings → Jarvis (or `supabase/jarvis.sql`) in Supabase. It uses Supabase's free `pg_cron` to call `/api/jarvis/tick` every 5 minutes, and the code decides what's due:
    - morning briefing ~20 min after Subuh (AI-written; also saved in the chat)

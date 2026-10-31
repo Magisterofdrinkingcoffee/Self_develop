@@ -81,7 +81,8 @@ export default function App() {
     if (t === "coach") t = "jarvis";
     if (q.get("tab")) askedTab.current = true;
     if (t && TABS.some((x) => x.id === t)) setTab(t);
-    if (q.get("listen")) { setTab("jarvis"); setListenAt(Date.now()); }
+    // Opened by the Siri shortcut (/?listen=1): remember it, so it still works after signing in
+    if (q.get("listen")) { try { sessionStorage.setItem("jarvis-listen", String(Date.now())); } catch {} }
     if (q.get("connected")) setNotice({ kind: "good", text: `${q.get("connected") === "google" ? "Google" : "Outlook"} is connected.` });
     if (q.get("connect_error")) setNotice({ kind: "bad", text: q.get("connect_error") });
     if ([...q.keys()].length) history.replaceState(null, "", "/");
@@ -162,6 +163,14 @@ export default function App() {
       }),
     []
   );
+
+  // Start listening once the app is ready, if Siri (or the app shortcut) opened it with ?listen=1
+  useEffect(() => {
+    if (status !== "ready") return;
+    let at = 0;
+    try { at = Number(sessionStorage.getItem("jarvis-listen") || 0); sessionStorage.removeItem("jarvis-listen"); } catch {}
+    if (at && Date.now() - at < 5 * 60e3) { setTab("jarvis"); setListenAt(Date.now()); }
+  }, [status]);
 
   // Take a newer copy of the data saved on the server (by Jarvis, an undo, a notification button)
   const adopt = useCallback((d) => {

@@ -109,8 +109,9 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [turns, busy]);
 
-  const say = (text) => {
-    if (!speak || typeof speechSynthesis === "undefined") return;
+  // Voice in → voice out: replies to a voice message are always read aloud
+  const say = (text, force = false) => {
+    if ((!speak && !force) || typeof speechSynthesis === "undefined") return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(plainForSpeech(text));
     u.lang = /[а-яёәіңғүұқөһ]/i.test(text) ? "ru-RU" : "en-US";
@@ -138,7 +139,7 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
       setTurns((t) => [...t, { role: "model", text: j.reply, at: new Date().toISOString(), actions: j.actions }]);
       if (j.data) adopt?.(j.data);
       if (j.actions?.length || j.undone) load();
-      say(j.reply);
+      say(j.reply, !!opts.audio);
     } catch (e) {
       setErr(String(e.message || e));
     } finally {
@@ -156,7 +157,7 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
     } else setErr(j?.error || "Couldn't undo");
   };
 
-  // Tap once to start recording, tap again to send (stops by itself after 60 s)
+  // Tap to talk. It sends by itself when you stop speaking (or tap the red button to send now).
   const listen = async () => {
     if (listening) { recRef.current?.stop(); return; }
     setErr("");
@@ -164,30 +165,68 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      setErr("Microphone is blocked. Allow it for this site in Settings → Safari → Microphone (or in your browser), then try again.");
+      setErr("Microphone is blocked. Allow it for this site in Settings → Apps → Safari → Microphone, then try again.");
       return;
     }
     const rec = new MediaRecorder(stream);
     const chunks = [];
+    let heard = false, cancelled = false, vad = null;
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     rec.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop());
       clearTimeout(rec._limit);
+      if (vad) { clearInterval(vad.timer); vad.ctx.close?.(); }
       setListening(false);
+      if (cancelled) return;
       const blob = new Blob(chunks, { type: rec.mimeType || "audio/mp4" });
       if (blob.size < 2000) return;
       try {
         const data = await blobToWavBase64(blob);
-        send("", { voice: speak, audio: { mime: "audio/wav", data } });
+        send("", { voice: true, audio: { mime: "audio/wav", data } });
       } catch {
         setErr("Couldn't process the recording. Try again, or type it.");
       }
     };
     recRef.current = rec;
-    rec.start();
-    rec._limit = setTimeout(() => rec.state === "recording" && rec.stop(), 60e3);
+    rec.start(250);
+    rec._limit = setTimeout(() => rec.state === "recording" && rec.stop(), 45e3);
     setListening(true);
+
+    // Simple voice-activity detection: stop ~1.5 s after you finish talking; give up if nothing is said in 8 s
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AC();
+      if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+      const an = ctx.createAnalyser();
+      an.fftSize = 1024;
+      ctx.createMediaStreamSource(stream).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      const started = Date.now();
+      let floor = 0.01, lastLoud = 0;
+      vad = { ctx, timer: setInterval(() => {
+        if (rec.state !== "recording") return;
+        an.getFloatTimeDomainData(buf);
+        let sum = 0;
+        for (const v of buf) sum += v * v;
+        const rms = Math.sqrt(sum / buf.length);
+        // Room noise = a running minimum that slowly drifts up, so it adapts to a noisy room
+        floor = Math.min(floor * 1.01, Math.max(rms, 0.002));
+        const now = Date.now();
+        if (rms > Math.max(0.02, floor * 3)) { heard = true; lastLoud = now; }
+        if (heard && now - lastLoud > 1500) rec.stop();
+        if (!heard && now - started > 8000) { cancelled = true; rec.stop(); }
+      }, 100) };
+    } catch {
+      // No audio analysis available: tap the red button to send
+    }
   };
+
+  // Unlock speech on iPhone: speaking is only allowed after a tap, so prime it on the first tap anywhere
+  useEffect(() => {
+    const prime = () => { try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } catch {} };
+    window.addEventListener("pointerdown", prime, { once: true });
+    return () => window.removeEventListener("pointerdown", prime);
+  }, []);
 
   // Opened from the mic button on another screen (or the app shortcut): start listening straight away
   useEffect(() => {
@@ -306,7 +345,7 @@ export default function Jarvis({ data, update, go, storage, adopt, listenAt }) {
         <textarea
           rows={1}
           value={input}
-          placeholder={listening ? "Recording… tap the red button to send" : `Message ${name}…`}
+          placeholder={listening ? "Listening… just talk, it sends when you stop" : `Message ${name}…`}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
         />
