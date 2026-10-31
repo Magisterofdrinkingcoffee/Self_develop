@@ -276,18 +276,19 @@ $$);`;
 
       <div className="setup-list">
         <button className="setup-row" onClick={() => show("siri")} aria-expanded={open === "siri"}>
-          <strong>Siri: "Hey Siri, Jarvis"</strong><span className="muted small">3 steps, about 1 minute</span>
+          <strong>Siri</strong><span className="muted small">3 steps, about 2 minutes</span>
         </button>
         {open === "siri" && (
           <div className="stack setup-body">
-            <Copy label="Your Siri link (private, it works like a password)" value={token ? `${origin}/api/jarvis/siri?token=${token}&q=` : "Loading…"} />
+            <Copy label="Your Siri link (private, it works like a password)" value={token ? `${origin}/api/jarvis/siri?token=${token}` : "Loading…"} />
             <ol className="howto">
-              <li>Shortcuts app → <strong>+</strong> → rename it <strong>Jarvis</strong>.</li>
-              <li>Add <strong>Dictate Text</strong>.</li>
-              <li>Add <strong>Get Contents of URL</strong>. Paste the link, then at the very end tap and insert <strong>Dictated Text</strong>. Nothing else to change.</li>
-              <li>Add <strong>Speak Text</strong>.</li>
+              <li>Shortcuts app → <strong>+</strong> → name it something plain like <strong>Log it</strong> (not a person's name, or Siri looks in Contacts).</li>
+              <li>Add <strong>Record Audio</strong>. Tap its arrow: Start Recording <strong>Immediately</strong>, Finish Recording <strong>On Tap</strong>.</li>
+              <li>Add <strong>Get Contents of URL</strong> and paste the link. Tap its arrow: Method <strong>POST</strong>, Request Body <strong>File</strong>, File → <strong>Recorded Audio</strong>.</li>
+              <li>Add <strong>Speak Text</strong> (it shows as "Speak Contents of URL").</li>
             </ol>
-            <p className="small">Now say <strong>"Hey Siri, Jarvis"</strong>, then talk. Tip: put it on the Action Button or Back Tap for one press.</p>
+            <p className="muted small">Your voice goes to Jarvis as a recording, so it works without iPhone dictation, in English, Russian or Kazakh.</p>
+            <p className="small">Say <strong>"Hey Siri, log it"</strong>, talk, tap Done. Tip: put it on the Action Button or Back Tap for one press.</p>
             <button className="link small" onClick={() => confirm("Make a new link? The old Siri shortcut, health automation and tick stop working until you update them.") && get(true)}>Make a new link</button>
           </div>
         )}
