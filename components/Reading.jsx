@@ -5,6 +5,7 @@ import { Bar, Card, Del, Empty, Header, NoteArea, Seg } from "./ui";
 import PdfReader from "./PdfReader";
 import { dateKey, fmtDate, logMinimum, uid } from "@/lib/data";
 import Icon from "./Icon";
+import JarvisRead from "./JarvisRead";
 
 // Upload a PDF straight from the browser to Supabase Storage using a signed URL
 async function uploadPdf(file, onProgress) {
@@ -246,6 +247,7 @@ function BookView({ book, data, update, storage, back }) {
             </label>
           </div>
         )}
+        {book.file && storage && <JarvisRead book={book} data={data} update={update} />}
       </Card>
 
       <div className="grid2">

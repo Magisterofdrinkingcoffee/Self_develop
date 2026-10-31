@@ -16,8 +16,8 @@ export default function manifest() {
       { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     shortcuts: [
+      { name: "Talk to Jarvis", url: "/?tab=jarvis&listen=1", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Log food", url: "/?tab=food", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
-      { name: "Ask coach", url: "/?tab=coach", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
     ],
   };
 }

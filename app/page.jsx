@@ -11,13 +11,15 @@ import Sport from "@/components/Sport";
 import Food from "@/components/Food";
 import Finance from "@/components/Finance";
 import Settings from "@/components/Settings";
-import Coach from "@/components/Coach";
+import Jarvis from "@/components/Jarvis";
+import Islam from "@/components/Islam";
 import Icon from "@/components/Icon";
 
 const TABS = [
   { id: "today", label: "Today", group: "Day", C: Today },
   { id: "planner", label: "Planner", group: "Day", C: Planner },
-  { id: "coach", label: "Coach", group: "Day", C: Coach },
+  { id: "jarvis", label: "Jarvis", group: "Day", C: Jarvis },
+  { id: "islam", label: "Islam", group: "Day", C: Islam },
   { id: "studies", label: "Studies", group: "Work", C: Studies },
   { id: "projects", label: "Projects", group: "Work", C: Projects },
   { id: "reading", label: "Reading", group: "Work", C: Reading },
@@ -26,7 +28,7 @@ const TABS = [
   { id: "finance", label: "Finance", group: "Body & money", C: Finance },
   { id: "settings", label: "Settings", group: null, C: Settings },
 ];
-const BAR = ["today", "planner", "food", "coach"]; // iPhone tab bar; the rest live under "More"
+const BAR = ["today", "jarvis", "islam", "planner"]; // iPhone tab bar; the rest live under "More"
 const LOCAL_KEY = "life-tracker-data";
 
 export default function App() {
@@ -37,6 +39,8 @@ export default function App() {
   const [tab, setTab] = useState("today");
   const [more, setMore] = useState(false);
   const [notice, setNotice] = useState(null); // { kind: "good"|"bad", text }
+  const [listenAt, setListenAt] = useState(0); // set to start Jarvis listening right away
+  const askedTab = useRef(false);
   const timer = useRef(null);
   const first = useRef(true);
   const version = useRef(null); // data.updatedAt of what we last loaded/saved
@@ -53,7 +57,9 @@ export default function App() {
       if (json.storage) {
         setStorage(true);
         version.current = json.data?.updatedAt ?? null;
-        setData(normalize(json.data));
+        const d = normalize(json.data);
+        setData(d);
+        if (!askedTab.current && d.settings.jarvis?.openOnJarvis) setTab("jarvis");
       } else {
         setStorage(false);
         let local = null;
@@ -72,7 +78,10 @@ export default function App() {
     const q = new URLSearchParams(location.search);
     let t = q.get("tab");
     try { if (!t) t = localStorage.getItem("life-tracker-tab"); } catch {}
+    if (t === "coach") t = "jarvis";
+    if (q.get("tab")) askedTab.current = true;
     if (t && TABS.some((x) => x.id === t)) setTab(t);
+    if (q.get("listen")) { setTab("jarvis"); setListenAt(Date.now()); }
     if (q.get("connected")) setNotice({ kind: "good", text: `${q.get("connected") === "google" ? "Google" : "Outlook"} is connected.` });
     if (q.get("connect_error")) setNotice({ kind: "bad", text: q.get("connect_error") });
     if ([...q.keys()].length) history.replaceState(null, "", "/");
@@ -154,6 +163,14 @@ export default function App() {
     []
   );
 
+  // Take a newer copy of the data saved on the server (by Jarvis, an undo, a notification button)
+  const adopt = useCallback((d) => {
+    if (!d) return;
+    version.current = d.updatedAt ?? null;
+    first.current = true;
+    setData(normalize(d));
+  }, []);
+
   const go = (id) => {
     setTab(id);
     setMore(false);
@@ -206,8 +223,14 @@ export default function App() {
             Storage isn't connected yet, so data is only kept in this browser. Connect Supabase to sync across devices (see README).
           </div>
         )}
-        <Current data={data} update={update} go={go} storage={storage} />
+        <Current data={data} update={update} go={go} storage={storage} adopt={adopt} listenAt={listenAt} />
       </main>
+
+      {tab !== "jarvis" && (
+        <button className="fab" aria-label={`Talk to ${data.settings.jarvis?.voiceName || "Jarvis"}`} title={`Talk to ${data.settings.jarvis?.voiceName || "Jarvis"}`} onClick={() => { go("jarvis"); setListenAt(Date.now()); }}>
+          <Icon name="mic" size={24} />
+        </button>
+      )}
 
       <nav className="tabbar" aria-label="Sections">
         {BAR.map((id) => {
